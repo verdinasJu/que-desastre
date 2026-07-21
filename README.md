@@ -2,6 +2,9 @@
 
 App web de finanzas personales (PWA). En el móvil puedes **Añadir a pantalla de inicio** y se comporta como una app nativa.
 
+**En producción:** [https://que-desastre.vercel.app](https://que-desastre.vercel.app)  
+**Código:** [https://github.com/verdinasJu/que-desastre](https://github.com/verdinasJu/que-desastre)
+
 ## Qué hace
 
 - Configuras nómina, ahorro e inversión inicial y gastos fijos
