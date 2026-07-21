@@ -1,0 +1,80 @@
+@import url("https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --ink: #0f1c24;
+  --ink-muted: #5b6b76;
+  --ink-faint: #94a3b0;
+  --surface: #ffffff;
+  --surface-2: #f3f7f6;
+  --surface-3: #e7efed;
+  --line: #d7e2df;
+  --brand: #0f766e;
+  --brand-dark: #0b5f59;
+  --canvas-from: #eef6f3;
+  --canvas-via: #f7faf9;
+  --canvas-to: #e8f0f6;
+  --background: var(--canvas-from);
+  --foreground: var(--ink);
+}
+
+@layer base {
+  * {
+    @apply border-line;
+  }
+
+  html {
+    @apply antialiased;
+  }
+
+  body {
+    @apply min-h-dvh text-ink;
+    font-family: "Outfit", system-ui, sans-serif;
+    background:
+      radial-gradient(1200px 600px at 10% -10%, rgba(15, 118, 110, 0.12), transparent 55%),
+      radial-gradient(900px 500px at 100% 0%, rgba(2, 132, 199, 0.1), transparent 50%),
+      linear-gradient(165deg, var(--canvas-from), var(--canvas-via) 45%, var(--canvas-to));
+    background-attachment: fixed;
+  }
+}
+
+@layer utilities {
+  .font-display {
+    font-family: "Fraunces", Georgia, serif;
+  }
+
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .animate-rise {
+    animation: rise 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .animate-fade {
+    animation: fade 0.45s ease both;
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
