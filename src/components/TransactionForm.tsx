@@ -6,7 +6,12 @@ import { Input } from "@/components/ui/input";
 import { DateInput } from "@/components/ui/date-input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import type { TransactionType } from "@/lib/types";
+import type { Transaction, TransactionType } from "@/lib/types";
+import {
+  EXPENSE_CATEGORIES,
+  INCOME_CATEGORIES,
+  INVESTMENT_CATEGORIES,
+} from "@/lib/constants";
 
 const TYPES: { value: TransactionType; label: string }[] = [
   { value: "expense", label: "Gasto" },
@@ -14,34 +19,56 @@ const TYPES: { value: TransactionType; label: string }[] = [
   { value: "investment", label: "Inversión" },
 ];
 
-const CATEGORIES: Record<TransactionType, string[]> = {
-  expense: ["Comida", "Transporte", "Ocio", "Salud", "Casa", "Otros"],
-  income: ["Extra", "Venta", "Regalo", "Otros"],
-  investment: ["Fondos", "Acciones", "Crypto", "Otros"],
+const CATEGORIES: Record<TransactionType, readonly string[]> = {
+  expense: EXPENSE_CATEGORIES,
+  income: INCOME_CATEGORIES,
+  investment: INVESTMENT_CATEGORIES,
+};
+
+export type TransactionFormValues = {
+  type: TransactionType;
+  amount: number;
+  description: string;
+  category: string;
+  date: string;
 };
 
 interface TransactionFormProps {
-  onSubmit: (values: {
-    type: TransactionType;
-    amount: number;
-    description: string;
-    category: string;
-    date: string;
-  }) => Promise<void> | void;
+  onSubmit: (values: TransactionFormValues) => Promise<void> | void;
   loading?: boolean;
   defaultType?: TransactionType;
+  initial?: Transaction | null;
+  submitLabel?: string;
+}
+
+function categoriesFor(
+  type: TransactionType,
+  current?: string
+): string[] {
+  const base = [...CATEGORIES[type]];
+  if (current && !base.includes(current)) base.unshift(current);
+  return base;
 }
 
 export function TransactionForm({
   onSubmit,
   loading,
   defaultType = "expense",
+  initial,
+  submitLabel = "Guardar",
 }: TransactionFormProps) {
-  const [type, setType] = useState<TransactionType>(defaultType);
-  const [amount, setAmount] = useState("");
-  const [description, setDescription] = useState("");
-  const [category, setCategory] = useState(CATEGORIES[defaultType][0]);
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const startType = initial?.type ?? defaultType;
+  const [type, setType] = useState<TransactionType>(startType);
+  const [amount, setAmount] = useState(
+    initial ? String(initial.amount) : ""
+  );
+  const [description, setDescription] = useState(initial?.description ?? "");
+  const [category, setCategory] = useState(
+    initial?.category ?? CATEGORIES[startType][0]
+  );
+  const [date, setDate] = useState(
+    initial?.date ?? new Date().toISOString().slice(0, 10)
+  );
 
   function changeType(next: TransactionType) {
     setType(next);
@@ -59,8 +86,10 @@ export function TransactionForm({
       category,
       date,
     });
-    setAmount("");
-    setDescription("");
+    if (!initial) {
+      setAmount("");
+      setDescription("");
+    }
   }
 
   return (
@@ -115,7 +144,7 @@ export function TransactionForm({
             onChange={(e) => setCategory(e.target.value)}
             className="flex h-11 w-full rounded-xl border border-line bg-surface px-3 text-sm text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/35"
           >
-            {CATEGORIES[type].map((c) => (
+            {categoriesFor(type, category).map((c) => (
               <option key={c} value={c}>
                 {c}
               </option>
@@ -134,7 +163,7 @@ export function TransactionForm({
       </div>
 
       <Button type="submit" className="w-full" disabled={loading}>
-        {loading ? "Guardando…" : "Guardar"}
+        {loading ? "Guardando…" : submitLabel}
       </Button>
     </form>
   );

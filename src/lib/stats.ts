@@ -1,4 +1,5 @@
 import type { FixedExpense, MonthStats, Profile, Transaction } from "./types";
+import { AUTO_SALARY_DESCRIPTION } from "./constants";
 
 /**
  * Patrimonio total = ahorro inicial + inversiones iniciales + ingresos - gastos
@@ -20,7 +21,10 @@ export function calcPatrimonio(
 
 /**
  * Disponible para gastar (mes) =
- * nómina - gastos fijos - inversiones del mes - gastos variables del mes + ingresos del mes
+ * ingreso base del mes + otros ingresos − fijos − inversiones − gastos variables
+ *
+ * Ingreso base = ingreso automático si ya se generó, si no la cifra configurada
+ * (para no contar dos veces nómina + ingreso automático).
  */
 export function calcMonthStats(
   profile: Profile,
@@ -39,20 +43,37 @@ export function calcMonthStats(
 
   const gastosVariablesDelMes = sumByType(monthTx, "expense");
   const invertidoEsteMes = sumByType(monthTx, "investment");
-  const ingresosDelMes = sumByType(monthTx, "income");
+
+  const autoIncome = monthTx
+    .filter(
+      (t) =>
+        t.type === "income" && t.description === AUTO_SALARY_DESCRIPTION
+    )
+    .reduce((acc, t) => acc + Number(t.amount), 0);
+
+  const otherIncome = monthTx
+    .filter(
+      (t) =>
+        t.type === "income" && t.description !== AUTO_SALARY_DESCRIPTION
+    )
+    .reduce((acc, t) => acc + Number(t.amount), 0);
+
+  const ingresoBaseDelMes =
+    autoIncome > 0 ? autoIncome : Number(profile.monthly_salary);
+
+  const ingresosDelMes = autoIncome + otherIncome;
 
   const gastadoEsteMes = gastosFijosDelMes + gastosVariablesDelMes;
 
   const disponibleParaGastar =
-    Number(profile.monthly_salary) +
-    ingresosDelMes -
+    ingresoBaseDelMes +
+    otherIncome -
     gastosFijosDelMes -
     invertidoEsteMes -
     gastosVariablesDelMes;
 
-  // Ahorro del mes = lo que queda de la nómina tras gastos e inversiones (sin contar ingresos extra)
   const ahorroDelMes =
-    Number(profile.monthly_salary) -
+    ingresoBaseDelMes -
     gastosFijosDelMes -
     invertidoEsteMes -
     gastosVariablesDelMes;
@@ -66,6 +87,7 @@ export function calcMonthStats(
     ingresosDelMes,
     gastosFijosDelMes,
     gastosVariablesDelMes,
+    ingresoBaseDelMes,
   };
 }
 
@@ -85,7 +107,10 @@ export function expensesByCategory(
   const map = new Map<string, number>();
 
   for (const f of fixedExpenses.filter((x) => x.active)) {
-    map.set(f.category || "Fijos", (map.get(f.category || "Fijos") || 0) + Number(f.amount));
+    map.set(
+      f.category || "Fijos",
+      (map.get(f.category || "Fijos") || 0) + Number(f.amount)
+    );
   }
   for (const t of variableExpenses.filter((x) => x.type === "expense")) {
     const cat = t.category || "Otros";
@@ -95,6 +120,30 @@ export function expensesByCategory(
   return Array.from(map.entries())
     .map(([name, value]) => ({ name, value }))
     .sort((a, b) => b.value - a.value);
+}
+
+export function spentByCategoryThisMonth(
+  fixedExpenses: FixedExpense[],
+  transactions: Transaction[],
+  monthStart: string,
+  monthEnd: string
+): Map<string, number> {
+  const map = new Map<string, number>();
+  for (const f of fixedExpenses.filter((x) => x.active)) {
+    const cat = f.category || "Fijos";
+    map.set(cat, (map.get(cat) || 0) + Number(f.amount));
+  }
+  for (const t of transactions) {
+    if (
+      t.type === "expense" &&
+      t.date >= monthStart &&
+      t.date <= monthEnd
+    ) {
+      const cat = t.category || "Otros";
+      map.set(cat, (map.get(cat) || 0) + Number(t.amount));
+    }
+  }
+  return map;
 }
 
 export function monthlyEvolution(
@@ -123,11 +172,18 @@ export function monthlyEvolution(
       month: "short",
       year: "2-digit",
     });
+    const auto = monthTx
+      .filter(
+        (t) =>
+          t.type === "income" && t.description === AUTO_SALARY_DESCRIPTION
+      )
+      .reduce((a, t) => a + Number(t.amount), 0);
+    const other = sumByType(monthTx, "income") - auto;
     result.push({
       month: label,
       gastado: sumByType(monthTx, "expense"),
       invertido: sumByType(monthTx, "investment"),
-      ingresos: sumByType(monthTx, "income") + Number(profile.monthly_salary),
+      ingresos: (auto > 0 ? auto : Number(profile.monthly_salary)) + other,
     });
   }
 

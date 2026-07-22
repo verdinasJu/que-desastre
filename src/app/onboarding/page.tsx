@@ -19,6 +19,7 @@ export default function OnboardingPage() {
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
   const [salary, setSalary] = useState("");
+  const [payday, setPayday] = useState("1");
   const [savings, setSavings] = useState("");
   const [investments, setInvestments] = useState("");
   const [fixed, setFixed] = useState<FixedDraft[]>([
@@ -49,6 +50,7 @@ export default function OnboardingPage() {
       .upsert({
         id: user.id,
         monthly_salary: Number(salary.replace(",", ".")) || 0,
+        payday_day: Math.min(28, Math.max(1, Number(payday) || 1)),
         initial_savings: Number(savings.replace(",", ".")) || 0,
         initial_investments: Number(investments.replace(",", ".")) || 0,
         currency: "EUR",
@@ -133,6 +135,23 @@ export default function OnboardingPage() {
                 onChange={(e) => setSalary(e.target.value)}
                 autoFocus
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="payday">¿Qué día del mes lo cobras?</Label>
+              <Input
+                id="payday"
+                inputMode="numeric"
+                type="number"
+                min={1}
+                max={28}
+                placeholder="1"
+                value={payday}
+                onChange={(e) => setPayday(e.target.value)}
+              />
+              <p className="text-xs text-ink-muted leading-relaxed">
+                Ese día se registrará solo el ingreso mensual. Usa un día entre
+                1 y 28.
+              </p>
             </div>
           </>
         )}

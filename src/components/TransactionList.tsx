@@ -1,6 +1,12 @@
 "use client";
 
-import { ArrowDownLeft, ArrowUpRight, TrendingUp, Trash2 } from "lucide-react";
+import {
+  ArrowDownLeft,
+  ArrowUpRight,
+  TrendingUp,
+  Trash2,
+  Pencil,
+} from "lucide-react";
 import { formatCurrency, formatDate, cn } from "@/lib/utils";
 import type { Transaction } from "@/lib/types";
 import { Button } from "@/components/ui/button";
@@ -9,6 +15,7 @@ interface TransactionListProps {
   items: Transaction[];
   currency?: string;
   onDelete?: (id: string) => void;
+  onEdit?: (tx: Transaction) => void;
 }
 
 const meta = {
@@ -39,6 +46,7 @@ export function TransactionList({
   items,
   currency = "EUR",
   onDelete,
+  onEdit,
 }: TransactionListProps) {
   if (items.length === 0) {
     return (
@@ -58,7 +66,7 @@ export function TransactionList({
         return (
           <li
             key={t.id}
-            className="flex items-center gap-3 rounded-2xl border border-line/70 bg-surface px-3 py-3 shadow-sm"
+            className="flex items-center gap-2 rounded-2xl border border-line/70 bg-surface px-3 py-3 shadow-sm"
           >
             <div
               className={cn(
@@ -68,15 +76,20 @@ export function TransactionList({
             >
               <Icon className="h-4 w-4" />
             </div>
-            <div className="min-w-0 flex-1">
+            <button
+              type="button"
+              className="min-w-0 flex-1 text-left"
+              onClick={() => onEdit?.(t)}
+              disabled={!onEdit}
+            >
               <p className="truncate text-sm font-semibold text-ink">
                 {t.description || t.category}
               </p>
               <p className="text-xs text-ink-muted">
                 {m.label} · {t.category} · {formatDate(t.date)}
               </p>
-            </div>
-            <div className="flex items-center gap-1">
+            </button>
+            <div className="flex items-center gap-0.5">
               <span
                 className={cn(
                   "text-sm font-semibold tabular-nums",
@@ -86,6 +99,18 @@ export function TransactionList({
                 {m.sign}
                 {formatCurrency(Number(t.amount), currency)}
               </span>
+              {onEdit ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-ink-faint hover:text-brand"
+                  onClick={() => onEdit(t)}
+                  aria-label="Editar"
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </Button>
+              ) : null}
               {onDelete ? (
                 <Button
                   type="button"

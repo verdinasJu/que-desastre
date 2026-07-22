@@ -17,6 +17,7 @@ export default function AjustesPage() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [fixed, setFixed] = useState<FixedExpense[]>([]);
   const [salary, setSalary] = useState("");
+  const [payday, setPayday] = useState("1");
   const [savings, setSavings] = useState("");
   const [investments, setInvestments] = useState("");
   const [newName, setNewName] = useState("");
@@ -44,6 +45,7 @@ export default function AjustesPage() {
         const profileData = p as Profile;
         setProfile(profileData);
         setSalary(String(profileData.monthly_salary));
+        setPayday(String(profileData.payday_day ?? 1));
         setSavings(String(profileData.initial_savings));
         setInvestments(String(profileData.initial_investments));
       }
@@ -60,6 +62,7 @@ export default function AjustesPage() {
       .from("profiles")
       .update({
         monthly_salary: Number(salary.replace(",", ".")) || 0,
+        payday_day: Math.min(28, Math.max(1, Number(payday) || 1)),
         initial_savings: Number(savings.replace(",", ".")) || 0,
         initial_investments: Number(investments.replace(",", ".")) || 0,
         updated_at: new Date().toISOString(),
@@ -165,6 +168,21 @@ export default function AjustesPage() {
               value={salary}
               onChange={(e) => setSalary(e.target.value)}
             />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="payday">Día de cobro (1–28)</Label>
+            <Input
+              id="payday"
+              type="number"
+              inputMode="numeric"
+              min={1}
+              max={28}
+              value={payday}
+              onChange={(e) => setPayday(e.target.value)}
+            />
+            <p className="text-xs text-ink-muted">
+              Ese día se crea solo el movimiento de ingreso mensual.
+            </p>
           </div>
           <div className="space-y-2">
             <Label htmlFor="savings">Ahorro inicial (€)</Label>
