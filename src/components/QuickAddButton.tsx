@@ -63,7 +63,7 @@ export function QuickAddButton() {
       <DialogTrigger asChild>
         <Button
           size="icon"
-          className="fixed bottom-20 right-4 z-50 h-14 w-14 rounded-full shadow-lg shadow-brand/30 sm:right-8"
+          className="fixed bottom-28 right-4 z-50 h-14 w-14 rounded-full shadow-lg shadow-brand/30 sm:bottom-24 sm:right-8"
           aria-label="Añadir movimiento"
         >
           <Plus className="h-6 w-6" />
