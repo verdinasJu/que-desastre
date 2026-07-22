@@ -181,7 +181,8 @@ export default function AjustesPage() {
               onChange={(e) => setPayday(e.target.value)}
             />
             <p className="text-xs text-ink-muted">
-              Ese día se crea solo el movimiento de ingreso mensual.
+              Se registra solo al llegar ese día (desde el próximo cobro). No
+              se añade al patrimonio en el momento de configurarlo.
             </p>
           </div>
           <div className="space-y-2">

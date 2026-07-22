@@ -17,9 +17,32 @@ function paydayDateForMonth(
   return d.toISOString().slice(0, 10);
 }
 
+/** Primera fecha de cobro ESTRICTAMENTE posterior a la fecha de onboarding. */
+export function firstPaydayAfter(
+  afterDateIso: string,
+  paydayDay: number
+): string {
+  const after = afterDateIso.slice(0, 10);
+  const base = new Date(`${after}T12:00:00`);
+  let year = base.getFullYear();
+  let month = base.getMonth();
+
+  for (let i = 0; i < 3; i++) {
+    const candidate = paydayDateForMonth(year, month, paydayDay);
+    if (candidate > after) return candidate;
+    month += 1;
+    if (month > 11) {
+      month = 0;
+      year += 1;
+    }
+  }
+
+  return paydayDateForMonth(year, month, paydayDay);
+}
+
 /**
- * Si ya ha llegado el día de cobro del mes y no existe el ingreso automático,
- * lo inserta una sola vez.
+ * Registra el ingreso automático solo cuando llega un día de cobro
+ * posterior al onboarding. No suma nada en el momento de configurar la cuenta.
  */
 export async function ensureMonthlyIncome(
   supabase: SupabaseClient,
@@ -31,6 +54,13 @@ export async function ensureMonthlyIncome(
   if (!salary || salary <= 0) return false;
 
   const payday = profile.payday_day ?? 1;
+  const onboardedAt =
+    profile.onboarding_completed_at ||
+    profile.updated_at ||
+    profile.created_at;
+  if (!onboardedAt) return false;
+
+  const firstAllowed = firstPaydayAfter(onboardedAt, payday);
   const now = new Date();
   const payDate = paydayDateForMonth(
     now.getFullYear(),
@@ -38,7 +68,10 @@ export async function ensureMonthlyIncome(
     payday
   );
   const today = now.toISOString().slice(0, 10);
+
+  // Aún no llega el cobro de este mes, o este cobro es anterior/igual al alta
   if (today < payDate) return false;
+  if (payDate < firstAllowed) return false;
 
   const { start, end } = currentMonthRange();
 

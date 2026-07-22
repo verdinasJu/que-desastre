@@ -55,6 +55,7 @@ export default function OnboardingPage() {
         initial_investments: Number(investments.replace(",", ".")) || 0,
         currency: "EUR",
         onboarding_completed: true,
+        onboarding_completed_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       });
 
@@ -149,8 +150,9 @@ export default function OnboardingPage() {
                 onChange={(e) => setPayday(e.target.value)}
               />
               <p className="text-xs text-ink-muted leading-relaxed">
-                Ese día se registrará solo el ingreso mensual. Usa un día entre
-                1 y 28.
+                Guardamos el día para registrar el ingreso solo a partir del
+                próximo cobro. No se suma ahora a tu patrimonio (para no
+                descuadrar lo que acabas de indicar).
               </p>
             </div>
           </>
