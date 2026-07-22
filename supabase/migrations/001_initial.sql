@@ -74,6 +74,15 @@ alter table public.profiles enable row level security;
 alter table public.fixed_expenses enable row level security;
 alter table public.transactions enable row level security;
 
+-- Permisos de tabla (sin esto RLS no basta: sale "permission denied")
+grant usage on schema public to anon, authenticated;
+grant select, insert, update, delete on table public.profiles to authenticated;
+grant select, insert, update, delete on table public.fixed_expenses to authenticated;
+grant select, insert, update, delete on table public.transactions to authenticated;
+grant select on table public.profiles to anon;
+grant select on table public.fixed_expenses to anon;
+grant select on table public.transactions to anon;
+
 -- Profiles policies
 drop policy if exists "profiles_select_own" on public.profiles;
 create policy "profiles_select_own" on public.profiles
