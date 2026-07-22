@@ -99,14 +99,14 @@ export function TransactionForm({
         <Label htmlFor="description">Descripción</Label>
         <Input
           id="description"
-          placeholder="Ej. Mercado, Uber, nómina extra…"
+          placeholder="Ej. Mercado, Uber, ingreso extra…"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-2">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="min-w-0 space-y-2">
           <Label htmlFor="category">Categoría</Label>
           <select
             id="category"
@@ -121,11 +121,12 @@ export function TransactionForm({
             ))}
           </select>
         </div>
-        <div className="space-y-2">
+        <div className="min-w-0 space-y-2">
           <Label htmlFor="date">Fecha</Label>
           <Input
             id="date"
             type="date"
+            className="input-date w-full"
             value={date}
             onChange={(e) => setDate(e.target.value)}
             required

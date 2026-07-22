@@ -77,7 +77,7 @@ export default async function DashboardPage() {
         <StatCard
           title="Disponible para gastar"
           value={stats.disponibleParaGastar}
-          hint="Nómina − fijos − inversiones − gastos + ingresos del mes"
+          hint="Ingreso mensual − fijos − inversiones − gastos + ingresos extra del mes"
           icon={Wallet}
           tone={stats.disponibleParaGastar >= 0 ? "positive" : "danger"}
           currency={p.currency}
@@ -101,7 +101,7 @@ export default async function DashboardPage() {
         <StatCard
           title="Ahorro del mes"
           value={stats.ahorroDelMes}
-          hint="Lo que queda de la nómina tras gastos e inversiones"
+          hint="Lo que queda de tu ingreso mensual tras gastos e inversiones"
           icon={PiggyBank}
           tone={stats.ahorroDelMes >= 0 ? "positive" : "warning"}
           currency={p.currency}

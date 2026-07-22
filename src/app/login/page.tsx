@@ -67,7 +67,7 @@ export default function LoginPage() {
             Que Desastre
           </p>
           <p className="text-sm text-ink-muted leading-relaxed">
-            Controla nómina, gastos, inversiones y ahorro sin perder de vista
+            Controla ingresos, gastos, inversiones y ahorro sin perder de vista
             tu patrimonio real.
           </p>
         </header>

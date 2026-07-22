@@ -12,7 +12,7 @@ import { formatCurrency } from "@/lib/utils";
 
 type FixedDraft = { name: string; amount: string; category: string };
 
-const STEPS = ["Nómina", "Patrimonio", "Gastos fijos"] as const;
+const STEPS = ["Ingresos", "Patrimonio", "Gastos fijos"] as const;
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -117,14 +117,14 @@ export default function OnboardingPage() {
         {step === 0 && (
           <>
             <h1 className="font-display text-2xl font-semibold">
-              ¿Cuánto cobras al mes?
+              ¿Cuánto ingresas al mes?
             </h1>
             <p className="text-sm text-ink-muted">
-              Usamos tu nómina para calcular cuánto te queda para gastar y
-              ahorrar cada mes.
+              Nómina, autónomo, pensión, ayudas… Lo usamos para calcular cuánto
+              te queda para gastar y ahorrar cada mes.
             </p>
             <div className="space-y-2">
-              <Label htmlFor="salary">Nómina mensual (€)</Label>
+              <Label htmlFor="salary">Ingreso mensual habitual (€)</Label>
               <Input
                 id="salary"
                 inputMode="decimal"

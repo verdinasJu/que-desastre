@@ -70,7 +70,7 @@ export default function MovimientosPage() {
           Movimientos
         </h1>
         <p className="text-sm text-ink-muted">
-          Filtra por fechas o busca por palabra en descripción y categoría.
+          Filtra por fechas o busca en descripción y categoría.
         </p>
       </header>
 

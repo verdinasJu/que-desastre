@@ -50,6 +50,19 @@
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 
+  .input-date {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  @media (max-width: 639px) {
+    .input-date {
+      padding-left: 0.625rem;
+      padding-right: 0.625rem;
+      font-size: 0.8125rem;
+    }
+  }
+
   .animate-rise {
     animation: rise 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
   }

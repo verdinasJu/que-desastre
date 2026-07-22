@@ -148,7 +148,7 @@ export default function AjustesPage() {
           Ajustes
         </h1>
         <p className="text-sm text-ink-muted">
-          Edita nómina, patrimonio inicial y gastos fijos.
+          Edita ingresos mensuales, patrimonio inicial y gastos fijos.
         </p>
       </header>
 
@@ -158,7 +158,7 @@ export default function AjustesPage() {
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="space-y-2">
-            <Label htmlFor="salary">Nómina mensual (€)</Label>
+            <Label htmlFor="salary">Ingreso mensual habitual (€)</Label>
             <Input
               id="salary"
               inputMode="decimal"
