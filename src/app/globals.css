@@ -51,15 +51,32 @@
   }
 
   .input-date {
+    display: block;
+    width: 100%;
     min-width: 0;
     max-width: 100%;
+    box-sizing: border-box;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+
+  .input-date::-webkit-date-and-time-value {
+    min-width: 0;
+    text-align: left;
+  }
+
+  .input-date::-webkit-calendar-picker-indicator {
+    margin: 0;
+    padding: 0;
+    flex-shrink: 0;
   }
 
   @media (max-width: 639px) {
     .input-date {
-      padding-left: 0.625rem;
-      padding-right: 0.625rem;
-      font-size: 0.8125rem;
+      padding-left: 0.5rem;
+      padding-right: 0.5rem;
+      font-size: 0.75rem;
+      letter-spacing: -0.01em;
     }
   }
 

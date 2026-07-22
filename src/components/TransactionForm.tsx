@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/ui/date-input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import type { TransactionType } from "@/lib/types";
@@ -105,7 +106,7 @@ export function TransactionForm({
         />
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <div className="space-y-3">
         <div className="min-w-0 space-y-2">
           <Label htmlFor="category">Categoría</Label>
           <select
@@ -123,10 +124,8 @@ export function TransactionForm({
         </div>
         <div className="min-w-0 space-y-2">
           <Label htmlFor="date">Fecha</Label>
-          <Input
+          <DateInput
             id="date"
-            type="date"
-            className="input-date w-full"
             value={date}
             onChange={(e) => setDate(e.target.value)}
             required
