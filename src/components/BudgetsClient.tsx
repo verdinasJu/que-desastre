@@ -1,6 +1,6 @@
-"use client";
+﻿"use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
@@ -10,7 +10,8 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/client";
 import { formatCurrency, cn } from "@/lib/utils";
-import type { CategoryBudget } from "@/lib/types";
+import { mergeCategories } from "@/lib/categories";
+import type { CategoryBudget, CustomCategory } from "@/lib/types";
 import { EXPENSE_CATEGORIES } from "@/lib/constants";
 
 interface BudgetsClientProps {
@@ -26,9 +27,27 @@ export function BudgetsClient({
 }: BudgetsClientProps) {
   const router = useRouter();
   const [budgets, setBudgets] = useState(initialBudgets);
+  const [categories, setCategories] = useState<string[]>([
+    ...EXPENSE_CATEGORIES,
+  ]);
   const [category, setCategory] = useState<string>(EXPENSE_CATEGORIES[0]);
   const [amount, setAmount] = useState("");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    async function loadCats() {
+      const supabase = createClient();
+      const { data } = await supabase
+        .from("custom_categories")
+        .select("*")
+        .eq("type", "expense");
+      const custom = ((data || []) as CustomCategory[]).map((c) => c.name);
+      const merged = mergeCategories("expense", custom);
+      setCategories(merged);
+      setCategory((prev) => (merged.includes(prev) ? prev : merged[0]));
+    }
+    loadCats();
+  }, []);
 
   async function addBudget() {
     const num = Number(amount.replace(",", "."));
@@ -103,7 +122,7 @@ export function BudgetsClient({
               onChange={(e) => setCategory(e.target.value)}
               className="flex h-11 w-full rounded-xl border border-line bg-surface px-3 text-sm"
             >
-              {EXPENSE_CATEGORIES.map((c) => (
+              {categories.map((c) => (
                 <option key={c} value={c}>
                   {c}
                 </option>
