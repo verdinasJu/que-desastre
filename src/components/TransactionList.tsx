@@ -8,12 +8,15 @@ import {
   Pencil,
 } from "lucide-react";
 import { formatCurrency, formatDate, cn } from "@/lib/utils";
+import { amountToWorkHours, formatWorkHours } from "@/lib/work-hours";
 import type { Transaction } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 
 interface TransactionListProps {
   items: Transaction[];
   currency?: string;
+  monthlySalary?: number;
+  hoursPerMonth?: number;
   onDelete?: (id: string) => void;
   onEdit?: (tx: Transaction) => void;
 }
@@ -45,6 +48,8 @@ const meta = {
 export function TransactionList({
   items,
   currency = "EUR",
+  monthlySalary = 0,
+  hoursPerMonth = 160,
   onDelete,
   onEdit,
 }: TransactionListProps) {
@@ -63,6 +68,12 @@ export function TransactionList({
       {items.map((t) => {
         const m = meta[t.type];
         const Icon = m.icon;
+        const workLabel =
+          t.type === "expense" && monthlySalary > 0
+            ? formatWorkHours(
+                amountToWorkHours(Number(t.amount), monthlySalary, hoursPerMonth)
+              )
+            : "";
         return (
           <li
             key={t.id}
@@ -87,6 +98,7 @@ export function TransactionList({
               </p>
               <p className="text-xs text-ink-muted">
                 {m.label} · {t.category} · {formatDate(t.date)}
+                {workLabel ? ` · ${workLabel}` : ""}
               </p>
             </button>
             <div className="flex items-center gap-0.5">

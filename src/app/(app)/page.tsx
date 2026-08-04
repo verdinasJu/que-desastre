@@ -8,12 +8,15 @@ import {
   AlertTriangle,
   Calculator,
   ChevronRight,
+  Plane,
 } from "lucide-react";
 import { StatCard } from "@/components/StatCard";
 import { DashboardCharts } from "@/components/DashboardCharts";
 import { GoalsSection } from "@/components/GoalsSection";
+import { AnomalyAlerts } from "@/components/AnomalyAlerts";
 import { createClient } from "@/lib/supabase/server";
 import { ensureMonthlyIncome } from "@/lib/auto-income";
+import { detectSpendingAnomalies } from "@/lib/anomalies";
 import {
   calcMonthStats,
   expensesByCategory,
@@ -79,6 +82,7 @@ export default async function DashboardPage() {
     year: "numeric",
   });
   const overBudget = stats.disponibleParaGastar < 0;
+  const anomalies = detectSpendingAnomalies(txList);
 
   return (
     <div className="space-y-6">
@@ -108,6 +112,8 @@ export default async function DashboardPage() {
           </div>
         </div>
       ) : null}
+
+      <AnomalyAlerts anomalies={anomalies} currency={p.currency} />
 
       <section className="grid gap-3 sm:grid-cols-2">
         <StatCard
@@ -154,21 +160,38 @@ export default async function DashboardPage() {
         />
       </section>
 
-      <Link
-        href="/calculadora"
-        className="animate-rise flex items-center gap-3 rounded-2xl border border-teal-100 bg-gradient-to-br from-teal-50 to-sky-50 px-4 py-4 shadow-sm transition hover:border-brand/30"
-      >
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand/10 text-brand">
-          <Calculator className="h-5 w-5" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="font-semibold text-ink">Calculadora de interés compuesto</p>
-          <p className="text-xs text-ink-muted leading-snug">
-            Simula cómo puede crecer tu inversión con aportaciones mensuales
-          </p>
-        </div>
-        <ChevronRight className="h-5 w-5 shrink-0 text-ink-faint" />
-      </Link>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Link
+          href="/calculadora"
+          className="animate-rise flex items-center gap-3 rounded-2xl border border-teal-100 bg-gradient-to-br from-teal-50 to-sky-50 px-4 py-4 shadow-sm transition hover:border-brand/30"
+        >
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand/10 text-brand">
+            <Calculator className="h-5 w-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="font-semibold text-ink">Interés compuesto</p>
+            <p className="text-xs text-ink-muted leading-snug">
+              Simula el crecimiento de tus inversiones
+            </p>
+          </div>
+          <ChevronRight className="h-5 w-5 shrink-0 text-ink-faint" />
+        </Link>
+        <Link
+          href="/viajes"
+          className="animate-rise flex items-center gap-3 rounded-2xl border border-sky-100 bg-gradient-to-br from-sky-50 to-indigo-50 px-4 py-4 shadow-sm transition hover:border-sky-300"
+        >
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-sky-100 text-sky-700">
+            <Plane className="h-5 w-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="font-semibold text-ink">Modo viaje</p>
+            <p className="text-xs text-ink-muted leading-snug">
+              Presupuesto y gastos por fechas de viaje
+            </p>
+          </div>
+          <ChevronRight className="h-5 w-5 shrink-0 text-ink-faint" />
+        </Link>
+      </div>
 
       <GoalsSection
         initialGoals={(goals || []) as SavingsGoal[]}

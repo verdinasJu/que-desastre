@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { FilterBar } from "@/components/FilterBar";
 import { TransactionList } from "@/components/TransactionList";
 import { TransactionForm } from "@/components/TransactionForm";
+import { CsvImportButton } from "@/components/CsvImportButton";
 import {
   Dialog,
   DialogContent,
@@ -14,7 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { createClient } from "@/lib/supabase/client";
 import { currentMonthRange } from "@/lib/utils";
-import type { Transaction } from "@/lib/types";
+import type { Profile, Transaction } from "@/lib/types";
 
 export default function MovimientosPage() {
   const range = currentMonthRange();
@@ -22,6 +23,7 @@ export default function MovimientosPage() {
   const [from, setFrom] = useState(range.start);
   const [to, setTo] = useState(range.end);
   const [items, setItems] = useState<Transaction[]>([]);
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Transaction | null>(null);
   const [saving, setSaving] = useState(false);
@@ -29,6 +31,10 @@ export default function MovimientosPage() {
   const load = useCallback(async () => {
     setLoading(true);
     const supabase = createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
     let q = supabase
       .from("transactions")
       .select("*")
@@ -38,13 +44,20 @@ export default function MovimientosPage() {
     if (from) q = q.gte("date", from);
     if (to) q = q.lte("date", to);
 
-    const { data, error } = await q;
+    const [{ data, error }, profileRes] = await Promise.all([
+      q,
+      user
+        ? supabase.from("profiles").select("*").eq("id", user.id).single()
+        : Promise.resolve({ data: null }),
+    ]);
+
     setLoading(false);
     if (error) {
       toast.error(error.message);
       return;
     }
     setItems((data || []) as Transaction[]);
+    if (profileRes.data) setProfile(profileRes.data as Profile);
   }, [from, to]);
 
   useEffect(() => {
@@ -103,13 +116,16 @@ export default function MovimientosPage() {
 
   return (
     <div className="space-y-5">
-      <header className="animate-rise space-y-1">
-        <h1 className="font-display text-3xl font-semibold tracking-tight">
-          Movimientos
-        </h1>
-        <p className="text-sm text-ink-muted">
-          Filtra por fechas o busca. Toca un movimiento o el lápiz para editarlo.
-        </p>
+      <header className="animate-rise flex items-start justify-between gap-3">
+        <div className="space-y-1">
+          <h1 className="font-display text-3xl font-semibold tracking-tight">
+            Movimientos
+          </h1>
+          <p className="text-sm text-ink-muted">
+            Filtra, edita o importa un CSV de tu banco.
+          </p>
+        </div>
+        <CsvImportButton onImported={load} />
       </header>
 
       <FilterBar
@@ -126,6 +142,8 @@ export default function MovimientosPage() {
       ) : (
         <TransactionList
           items={filtered}
+          monthlySalary={Number(profile?.monthly_salary || 0)}
+          hoursPerMonth={Number(profile?.hours_per_month || 160)}
           onDelete={handleDelete}
           onEdit={setEditing}
         />
@@ -148,6 +166,8 @@ export default function MovimientosPage() {
               initial={editing}
               loading={saving}
               submitLabel="Guardar cambios"
+              monthlySalary={Number(profile?.monthly_salary || 0)}
+              hoursPerMonth={Number(profile?.hours_per_month || 160)}
               onSubmit={handleEdit}
             />
           ) : null}

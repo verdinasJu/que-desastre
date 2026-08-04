@@ -9,6 +9,7 @@ export interface Profile {
   onboarding_completed: boolean;
   payday_day: number;
   onboarding_completed_at?: string;
+  hours_per_month: number;
   created_at?: string;
   updated_at?: string;
 }
@@ -31,6 +32,17 @@ export interface Transaction {
   description: string;
   category: string;
   date: string;
+  trip_id?: string | null;
+  created_at?: string;
+}
+
+export interface Trip {
+  id: string;
+  user_id: string;
+  name: string;
+  start_date: string;
+  end_date: string;
+  budget: number;
   created_at?: string;
 }
 

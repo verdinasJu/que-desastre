@@ -18,6 +18,7 @@ export default function AjustesPage() {
   const [fixed, setFixed] = useState<FixedExpense[]>([]);
   const [salary, setSalary] = useState("");
   const [payday, setPayday] = useState("1");
+  const [hoursMonth, setHoursMonth] = useState("160");
   const [savings, setSavings] = useState("");
   const [investments, setInvestments] = useState("");
   const [newName, setNewName] = useState("");
@@ -46,6 +47,7 @@ export default function AjustesPage() {
         setProfile(profileData);
         setSalary(String(profileData.monthly_salary));
         setPayday(String(profileData.payday_day ?? 1));
+        setHoursMonth(String(profileData.hours_per_month ?? 160));
         setSavings(String(profileData.initial_savings));
         setInvestments(String(profileData.initial_investments));
       }
@@ -63,6 +65,7 @@ export default function AjustesPage() {
       .update({
         monthly_salary: Number(salary.replace(",", ".")) || 0,
         payday_day: Math.min(28, Math.max(1, Number(payday) || 1)),
+        hours_per_month: Math.max(1, Number(hoursMonth.replace(",", ".")) || 160),
         initial_savings: Number(savings.replace(",", ".")) || 0,
         initial_investments: Number(investments.replace(",", ".")) || 0,
         updated_at: new Date().toISOString(),
@@ -183,6 +186,21 @@ export default function AjustesPage() {
             <p className="text-xs text-ink-muted">
               Se registra solo al llegar ese día (desde el próximo cobro). No
               se añade al patrimonio en el momento de configurarlo.
+            </p>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="hours">Horas de trabajo al mes</Label>
+            <Input
+              id="hours"
+              type="number"
+              inputMode="decimal"
+              min={1}
+              value={hoursMonth}
+              onChange={(e) => setHoursMonth(e.target.value)}
+            />
+            <p className="text-xs text-ink-muted">
+              Sirve para mostrar cada gasto en “horas de trabajo” (por defecto
+              160).
             </p>
           </div>
           <div className="space-y-2">

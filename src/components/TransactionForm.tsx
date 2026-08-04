@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { DateInput } from "@/components/ui/date-input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { amountToWorkHours, formatWorkHours } from "@/lib/work-hours";
 import type { Transaction, TransactionType } from "@/lib/types";
 import {
   EXPENSE_CATEGORIES,
@@ -39,6 +40,8 @@ interface TransactionFormProps {
   defaultType?: TransactionType;
   initial?: Transaction | null;
   submitLabel?: string;
+  monthlySalary?: number;
+  hoursPerMonth?: number;
 }
 
 function categoriesFor(
@@ -56,6 +59,8 @@ export function TransactionForm({
   defaultType = "expense",
   initial,
   submitLabel = "Guardar",
+  monthlySalary = 0,
+  hoursPerMonth = 160,
 }: TransactionFormProps) {
   const startType = initial?.type ?? defaultType;
   const [type, setType] = useState<TransactionType>(startType);
@@ -123,6 +128,21 @@ export function TransactionForm({
           required
           autoFocus
         />
+        {type === "expense" &&
+        monthlySalary > 0 &&
+        Number(amount.replace(",", ".")) > 0 ? (
+          <p className="text-xs text-ink-muted">
+            ≈{" "}
+            {formatWorkHours(
+              amountToWorkHours(
+                Number(amount.replace(",", ".")),
+                monthlySalary,
+                hoursPerMonth
+              )
+            )}{" "}
+            (según tu ingreso)
+          </p>
+        ) : null}
       </div>
 
       <div className="space-y-2">

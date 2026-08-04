@@ -9,6 +9,7 @@ export const EXPENSE_CATEGORIES = [
   "Casa",
   "Vivienda",
   "Servicios",
+  "Viaje",
   "Otros",
 ] as const;
 

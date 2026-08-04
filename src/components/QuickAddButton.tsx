@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 import { toast } from "sonner";
@@ -20,7 +20,30 @@ import type { TransactionType } from "@/lib/types";
 export function QuickAddButton() {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [monthlySalary, setMonthlySalary] = useState(0);
+  const [hoursPerMonth, setHoursPerMonth] = useState(160);
   const router = useRouter();
+
+  useEffect(() => {
+    if (!open) return;
+    async function loadProfile() {
+      const supabase = createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await supabase
+        .from("profiles")
+        .select("monthly_salary, hours_per_month")
+        .eq("id", user.id)
+        .single();
+      if (data) {
+        setMonthlySalary(Number(data.monthly_salary) || 0);
+        setHoursPerMonth(Number(data.hours_per_month) || 160);
+      }
+    }
+    loadProfile();
+  }, [open]);
 
   async function handleSubmit(values: {
     type: TransactionType;
@@ -73,11 +96,16 @@ export function QuickAddButton() {
         <DialogHeader>
           <DialogTitle>Nuevo movimiento</DialogTitle>
           <DialogDescription>
-            Gasto, ingreso o inversión. Las inversiones se restan del
-            disponible pero siguen contando en tu patrimonio.
+            Gasto, ingreso o inversión. En gastos verás también cuántas horas
+            de trabajo representa.
           </DialogDescription>
         </DialogHeader>
-        <TransactionForm onSubmit={handleSubmit} loading={loading} />
+        <TransactionForm
+          onSubmit={handleSubmit}
+          loading={loading}
+          monthlySalary={monthlySalary}
+          hoursPerMonth={hoursPerMonth}
+        />
       </DialogContent>
     </Dialog>
   );
