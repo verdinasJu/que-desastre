@@ -46,6 +46,14 @@ export interface Trip {
   created_at?: string;
 }
 
+export interface CustomCategory {
+  id: string;
+  user_id: string;
+  name: string;
+  type: TransactionType;
+  created_at?: string;
+}
+
 export interface CategoryBudget {
   id: string;
   user_id: string;

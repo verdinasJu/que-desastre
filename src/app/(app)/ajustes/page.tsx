@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/client";
 import type { FixedExpense, Profile } from "@/lib/types";
 import { formatCurrency } from "@/lib/utils";
+import { CategoriesManager } from "@/components/CategoriesManager";
 
 export default function AjustesPage() {
   const router = useRouter();
@@ -154,7 +155,7 @@ export default function AjustesPage() {
           Ajustes
         </h1>
         <p className="text-sm text-ink-muted">
-          Edita ingresos mensuales, patrimonio inicial y gastos fijos.
+          Edita ingresos, categorías, patrimonio inicial y gastos fijos.
         </p>
       </header>
 
@@ -226,6 +227,8 @@ export default function AjustesPage() {
           </Button>
         </CardContent>
       </Card>
+
+      <CategoriesManager />
 
       <Card>
         <CardHeader>

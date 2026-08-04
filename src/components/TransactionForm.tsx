@@ -1,30 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DateInput } from "@/components/ui/date-input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { amountToWorkHours, formatWorkHours } from "@/lib/work-hours";
-import type { Transaction, TransactionType } from "@/lib/types";
-import {
-  EXPENSE_CATEGORIES,
-  INCOME_CATEGORIES,
-  INVESTMENT_CATEGORIES,
-} from "@/lib/constants";
+import { mergeCategories } from "@/lib/categories";
+import { createClient } from "@/lib/supabase/client";
+import type { CustomCategory, Transaction, TransactionType } from "@/lib/types";
 
 const TYPES: { value: TransactionType; label: string }[] = [
   { value: "expense", label: "Gasto" },
   { value: "income", label: "Ingreso" },
   { value: "investment", label: "Inversión" },
 ];
-
-const CATEGORIES: Record<TransactionType, readonly string[]> = {
-  expense: EXPENSE_CATEGORIES,
-  income: INCOME_CATEGORIES,
-  investment: INVESTMENT_CATEGORIES,
-};
 
 export type TransactionFormValues = {
   type: TransactionType;
@@ -44,15 +35,6 @@ interface TransactionFormProps {
   hoursPerMonth?: number;
 }
 
-function categoriesFor(
-  type: TransactionType,
-  current?: string
-): string[] {
-  const base = [...CATEGORIES[type]];
-  if (current && !base.includes(current)) base.unshift(current);
-  return base;
-}
-
 export function TransactionForm({
   onSubmit,
   loading,
@@ -68,16 +50,41 @@ export function TransactionForm({
     initial ? String(initial.amount) : ""
   );
   const [description, setDescription] = useState(initial?.description ?? "");
-  const [category, setCategory] = useState(
-    initial?.category ?? CATEGORIES[startType][0]
-  );
+  const [category, setCategory] = useState(initial?.category ?? "Otros");
   const [date, setDate] = useState(
     initial?.date ?? new Date().toISOString().slice(0, 10)
   );
+  const [custom, setCustom] = useState<CustomCategory[]>([]);
+
+  useEffect(() => {
+    async function load() {
+      const supabase = createClient();
+      const { data } = await supabase.from("custom_categories").select("*");
+      setCustom((data || []) as CustomCategory[]);
+    }
+    load();
+  }, []);
+
+  const options = useMemo(() => {
+    const names = custom
+      .filter((c) => c.type === type)
+      .map((c) => c.name);
+    return mergeCategories(type, names, category);
+  }, [custom, type, category]);
+
+  useEffect(() => {
+    if (!options.includes(category) && options.length) {
+      setCategory(options[0]);
+    }
+  }, [options, category]);
 
   function changeType(next: TransactionType) {
     setType(next);
-    setCategory(CATEGORIES[next][0]);
+    const names = custom
+      .filter((c) => c.type === next)
+      .map((c) => c.name);
+    const opts = mergeCategories(next, names);
+    setCategory(opts[0] || "Otros");
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -164,7 +171,7 @@ export function TransactionForm({
             onChange={(e) => setCategory(e.target.value)}
             className="flex h-11 w-full rounded-xl border border-line bg-surface px-3 text-sm text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/35"
           >
-            {categoriesFor(type, category).map((c) => (
+            {options.map((c) => (
               <option key={c} value={c}>
                 {c}
               </option>
