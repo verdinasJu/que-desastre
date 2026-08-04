@@ -1,19 +1,14 @@
-import Link from "next/link";
 import {
   PiggyBank,
   Wallet,
   ArrowUpRight,
   TrendingUp,
   Landmark,
-  AlertTriangle,
-  Calculator,
-  ChevronRight,
-  Plane,
 } from "lucide-react";
 import { StatCard } from "@/components/StatCard";
 import { DashboardCharts } from "@/components/DashboardCharts";
 import { GoalsSection } from "@/components/GoalsSection";
-import { AnomalyAlerts } from "@/components/AnomalyAlerts";
+import { AlertsBell } from "@/components/AlertsBell";
 import { createClient } from "@/lib/supabase/server";
 import { ensureMonthlyIncome } from "@/lib/auto-income";
 import { detectSpendingAnomalies } from "@/lib/anomalies";
@@ -81,18 +76,28 @@ export default async function DashboardPage() {
     month: "long",
     year: "numeric",
   });
-  const overBudget = stats.disponibleParaGastar < 0;
+  const overBudgetAmount =
+    stats.disponibleParaGastar < 0
+      ? Math.abs(stats.disponibleParaGastar)
+      : 0;
   const anomalies = detectSpendingAnomalies(txList);
 
   return (
     <div className="space-y-6">
-      <header className="animate-rise space-y-1">
-        <p className="font-display text-3xl font-semibold tracking-tight text-ink">
-          Que Desastre
-        </p>
-        <p className="text-sm text-ink-muted capitalize">
-          Resumen de {monthLabel}
-        </p>
+      <header className="animate-rise flex items-start justify-between gap-3">
+        <div className="space-y-1 min-w-0">
+          <p className="font-display text-3xl font-semibold tracking-tight text-ink">
+            Que Desastre
+          </p>
+          <p className="text-sm text-ink-muted capitalize">
+            Resumen de {monthLabel}
+          </p>
+        </div>
+        <AlertsBell
+          anomalies={anomalies}
+          overBudgetAmount={overBudgetAmount}
+          currency={p.currency}
+        />
       </header>
 
       <section className="grid gap-3 sm:grid-cols-2">
@@ -140,26 +145,6 @@ export default async function DashboardPage() {
         />
       </section>
 
-      {overBudget ? (
-        <div className="animate-rise flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
-          <div>
-            <p className="font-semibold">Te has pasado del disponible</p>
-            <p className="mt-0.5 text-amber-900/80 leading-snug">
-              Llevas{" "}
-              {formatCurrency(
-                Math.abs(stats.disponibleParaGastar),
-                p.currency
-              )}{" "}
-              por encima de lo que te quedaba este mes. Revisa gastos o
-              presupuestos.
-            </p>
-          </div>
-        </div>
-      ) : null}
-
-      <AnomalyAlerts anomalies={anomalies} currency={p.currency} />
-
       <GoalsSection
         initialGoals={(goals || []) as SavingsGoal[]}
         currency={p.currency}
@@ -170,42 +155,6 @@ export default async function DashboardPage() {
         byCategory={byCategory}
         currency={p.currency}
       />
-
-      <section className="space-y-3">
-        <h2 className="font-display text-xl font-semibold">Herramientas</h2>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Link
-            href="/calculadora"
-            className="animate-rise flex items-center gap-3 rounded-2xl border border-teal-100 bg-gradient-to-br from-teal-50 to-sky-50 px-4 py-4 shadow-sm transition hover:border-brand/30"
-          >
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand/10 text-brand">
-              <Calculator className="h-5 w-5" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="font-semibold text-ink">Interés compuesto</p>
-              <p className="text-xs text-ink-muted leading-snug">
-                Simula el crecimiento de tus inversiones
-              </p>
-            </div>
-            <ChevronRight className="h-5 w-5 shrink-0 text-ink-faint" />
-          </Link>
-          <Link
-            href="/viajes"
-            className="animate-rise flex items-center gap-3 rounded-2xl border border-sky-100 bg-gradient-to-br from-sky-50 to-indigo-50 px-4 py-4 shadow-sm transition hover:border-sky-300"
-          >
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-sky-100 text-sky-700">
-              <Plane className="h-5 w-5" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="font-semibold text-ink">Modo viaje</p>
-              <p className="text-xs text-ink-muted leading-snug">
-                Presupuesto y gastos por fechas de viaje
-              </p>
-            </div>
-            <ChevronRight className="h-5 w-5 shrink-0 text-ink-faint" />
-          </Link>
-        </div>
-      </section>
     </div>
   );
 }
