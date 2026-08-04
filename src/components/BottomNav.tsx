@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, ListOrdered, Settings, WalletCards } from "lucide-react";
+import { Home, ListOrdered, Settings, WalletCards, Calculator } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const items = [
   { href: "/", label: "Inicio", icon: Home },
   { href: "/movimientos", label: "Movimientos", icon: ListOrdered },
   { href: "/presupuestos", label: "Presupuestos", icon: WalletCards },
+  { href: "/calculadora", label: "Calcular", icon: Calculator },
   { href: "/ajustes", label: "Ajustes", icon: Settings },
 ];
 
