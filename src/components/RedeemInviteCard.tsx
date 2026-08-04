@@ -40,6 +40,11 @@ export function RedeemInviteCard({
       type === "trip" ? "Te has unido al viaje" : "Te has unido al presupuesto"
     );
     setCode("");
+    if (type === "trip") {
+      router.push("/viajes");
+    } else if (type === "budget") {
+      router.push("/presupuestos");
+    }
     router.refresh();
   }
 

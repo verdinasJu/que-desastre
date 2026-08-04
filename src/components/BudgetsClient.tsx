@@ -91,6 +91,8 @@ export function BudgetsClient({
               ...r,
               spent: Number(r.spent),
             }));
+          } else if (error) {
+            toast.error(error.message);
           }
         })
       );
