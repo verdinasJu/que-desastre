@@ -6,6 +6,7 @@ import type {
   CategoryBudget,
   FixedExpense,
   Profile,
+  SharedBudget,
   Transaction,
 } from "@/lib/types";
 
@@ -15,21 +16,30 @@ export default async function PresupuestosPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const [{ data: profile }, { data: budgets }, { data: fixed }, { data: txs }] =
-    await Promise.all([
-      supabase.from("profiles").select("*").eq("id", user!.id).single(),
-      supabase
-        .from("category_budgets")
-        .select("*")
-        .eq("user_id", user!.id)
-        .order("category"),
-      supabase
-        .from("fixed_expenses")
-        .select("*")
-        .eq("user_id", user!.id)
-        .eq("active", true),
-      supabase.from("transactions").select("*").eq("user_id", user!.id),
-    ]);
+  const [
+    { data: profile },
+    { data: budgets },
+    { data: shared },
+    { data: fixed },
+    { data: txs },
+  ] = await Promise.all([
+    supabase.from("profiles").select("*").eq("id", user!.id).single(),
+    supabase
+      .from("category_budgets")
+      .select("*")
+      .eq("user_id", user!.id)
+      .order("category"),
+    supabase
+      .from("shared_budgets")
+      .select("*")
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("fixed_expenses")
+      .select("*")
+      .eq("user_id", user!.id)
+      .eq("active", true),
+    supabase.from("transactions").select("*").eq("user_id", user!.id),
+  ]);
 
   const { start, end } = currentMonthRange();
   const spentMap = spentByCategoryThisMonth(
@@ -48,17 +58,18 @@ export default async function PresupuestosPage() {
           Presupuestos
         </h1>
         <p className="text-sm leading-relaxed text-ink-muted">
-          Pon un tope mensual por categoría (ej. Comida 200 €). Aquí solo se
-          comparan tus gastos de <span className="font-medium text-ink">este
-          mes</span> (fijos + variables) con ese tope. No afecta al patrimonio:
-          es una guía para no pasarte.
+          Topes personales y compartidos (con código de un solo uso). Los
+          compartidos suman los gastos de cada miembro en esa categoría este
+          mes.
         </p>
       </header>
 
       <BudgetsClient
         initialBudgets={(budgets || []) as CategoryBudget[]}
+        initialShared={(shared || []) as SharedBudget[]}
         spentByCategory={spentByCategory}
         currency={p?.currency || "EUR"}
+        userId={user!.id}
       />
     </div>
   );

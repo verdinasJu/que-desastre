@@ -62,6 +62,22 @@ export interface CategoryBudget {
   created_at?: string;
 }
 
+export interface SharedBudget {
+  id: string;
+  owner_id: string;
+  category: string;
+  amount: number;
+  created_at?: string;
+}
+
+export interface TripMember {
+  trip_id: string;
+  user_id: string;
+  color: string;
+  label: string;
+  joined_at?: string;
+}
+
 export interface SavingsGoal {
   id: string;
   user_id: string;
