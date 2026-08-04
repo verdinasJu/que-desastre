@@ -58,13 +58,13 @@ export function detectSpendingAnomalies(
   });
 
   const categories = new Set<string>([
-    ...currentMap.keys(),
-    ...prevMaps.flatMap((m) => [...m.keys()]),
+    ...Array.from(currentMap.keys()),
+    ...prevMaps.flatMap((m) => Array.from(m.keys())),
   ]);
 
   const anomalies: SpendingAnomaly[] = [];
 
-  for (const category of categories) {
+  for (const category of Array.from(categories)) {
     const cur = currentMap.get(category) || 0;
     if (cur < 20) continue;
 
