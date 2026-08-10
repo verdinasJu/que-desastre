@@ -233,6 +233,10 @@ export default function AjustesPage() {
       <Card>
         <CardHeader>
           <CardTitle>Gastos fijos</CardTitle>
+          <p className="text-xs text-ink-muted leading-relaxed">
+            Cada mes se registran solos el día 1 como movimiento y restan del
+            patrimonio (como la nómina automática).
+          </p>
         </CardHeader>
         <CardContent className="space-y-3">
           <ul className="space-y-2">

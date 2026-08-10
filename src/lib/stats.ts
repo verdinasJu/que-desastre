@@ -1,4 +1,4 @@
-import type { FixedExpense, MonthStats, Profile, Transaction } from "./types";
+import type { MonthStats, Profile, Transaction } from "./types";
 import { AUTO_SALARY_DESCRIPTION } from "./constants";
 
 /**
@@ -28,7 +28,6 @@ export function calcPatrimonio(
  */
 export function calcMonthStats(
   profile: Profile,
-  fixedExpenses: FixedExpense[],
   allTransactions: Transaction[],
   monthStart: string,
   monthEnd: string
@@ -37,11 +36,13 @@ export function calcMonthStats(
     (t) => t.date >= monthStart && t.date <= monthEnd
   );
 
-  const gastosFijosDelMes = fixedExpenses
-    .filter((f) => f.active)
-    .reduce((acc, f) => acc + Number(f.amount), 0);
+  const gastosFijosDelMes = monthTx
+    .filter((t) => t.type === "expense" && t.fixed_expense_id)
+    .reduce((acc, t) => acc + Number(t.amount), 0);
 
-  const gastosVariablesDelMes = sumByType(monthTx, "expense");
+  const gastosVariablesDelMes = monthTx
+    .filter((t) => t.type === "expense" && !t.fixed_expense_id)
+    .reduce((acc, t) => acc + Number(t.amount), 0);
   const invertidoEsteMes = sumByType(monthTx, "investment");
 
   const autoIncome = monthTx
@@ -101,18 +102,11 @@ export function sumByType(
 }
 
 export function expensesByCategory(
-  fixedExpenses: FixedExpense[],
-  variableExpenses: Transaction[]
+  expenses: Transaction[]
 ): { name: string; value: number }[] {
   const map = new Map<string, number>();
 
-  for (const f of fixedExpenses.filter((x) => x.active)) {
-    map.set(
-      f.category || "Fijos",
-      (map.get(f.category || "Fijos") || 0) + Number(f.amount)
-    );
-  }
-  for (const t of variableExpenses.filter((x) => x.type === "expense")) {
+  for (const t of expenses.filter((x) => x.type === "expense")) {
     const cat = t.category || "Otros";
     map.set(cat, (map.get(cat) || 0) + Number(t.amount));
   }
@@ -123,16 +117,11 @@ export function expensesByCategory(
 }
 
 export function spentByCategoryThisMonth(
-  fixedExpenses: FixedExpense[],
   transactions: Transaction[],
   monthStart: string,
   monthEnd: string
 ): Map<string, number> {
   const map = new Map<string, number>();
-  for (const f of fixedExpenses.filter((x) => x.active)) {
-    const cat = f.category || "Fijos";
-    map.set(cat, (map.get(cat) || 0) + Number(f.amount));
-  }
   for (const t of transactions) {
     if (
       t.type === "expense" &&

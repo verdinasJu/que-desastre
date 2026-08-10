@@ -33,6 +33,7 @@ export interface Transaction {
   category: string;
   date: string;
   trip_id?: string | null;
+  fixed_expense_id?: string | null;
   created_at?: string;
 }
 

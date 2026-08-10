@@ -100,10 +100,9 @@ export function DashboardCharts({
           <CardTitle>Evolución mensual</CardTitle>
           <CardDescription className="leading-relaxed">
             Compara los últimos 6 meses: cuánto has{" "}
-            <span className="font-medium text-rose-600">gastado</span> (variables)
-            y cuánto has{" "}
-            <span className="font-medium text-sky-600">invertido</span>. No incluye
-            gastos fijos como alquiler — solo movimientos registrados.
+            <span className="font-medium text-rose-600">gastado</span> (fijos
+            automáticos + variables) y cuánto has{" "}
+            <span className="font-medium text-sky-600">invertido</span>.
           </CardDescription>
         </CardHeader>
         <CardContent className="pb-5 pt-2">
@@ -197,9 +196,8 @@ export function DashboardCharts({
         <CardHeader>
           <CardTitle>Gastos por categoría</CardTitle>
           <CardDescription className="leading-relaxed">
-            Reparto de lo gastado <span className="font-medium">este mes</span>:
-            gastos fijos activos (alquiler, teléfono…) + gastos variables que
-            hayas registrado, agrupados por categoría.
+            Reparto de lo gastado <span className="font-medium">este mes</span>,
+            incluidos los fijos registrados automáticamente el día 1.
           </CardDescription>
         </CardHeader>
         <CardContent className="pb-5 pt-2">

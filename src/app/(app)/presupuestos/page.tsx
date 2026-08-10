@@ -43,7 +43,6 @@ export default async function PresupuestosPage() {
 
   const { start, end } = currentMonthRange();
   const spentMap = spentByCategoryThisMonth(
-    (fixed || []) as FixedExpense[],
     (txs || []) as Transaction[],
     start,
     end

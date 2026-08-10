@@ -10,7 +10,6 @@ import { DashboardCharts } from "@/components/DashboardCharts";
 import { GoalsSection } from "@/components/GoalsSection";
 import { AlertsBell } from "@/components/AlertsBell";
 import { createClient } from "@/lib/supabase/server";
-import { ensureMonthlyIncome } from "@/lib/auto-income";
 import { detectSpendingAnomalies } from "@/lib/anomalies";
 import {
   calcMonthStats,
@@ -19,7 +18,6 @@ import {
 } from "@/lib/stats";
 import { currentMonthRange, formatCurrency } from "@/lib/utils";
 import type {
-  FixedExpense,
   Profile,
   SavingsGoal,
   Transaction,
@@ -31,14 +29,9 @@ export default async function DashboardPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const [{ data: profile }, { data: fixed }, { data: transactions }, { data: goals }] =
+  const [{ data: profile }, { data: transactions }, { data: goals }] =
     await Promise.all([
       supabase.from("profiles").select("*").eq("id", user!.id).single(),
-      supabase
-        .from("fixed_expenses")
-        .select("*")
-        .eq("user_id", user!.id)
-        .eq("active", true),
       supabase
         .from("transactions")
         .select("*")
@@ -52,25 +45,14 @@ export default async function DashboardPage() {
     ]);
 
   const p = { ...(profile as Profile), payday_day: (profile as Profile)?.payday_day ?? 1 };
-  let txList = (transactions || []) as Transaction[];
-  const fixedList = (fixed || []) as FixedExpense[];
-
-  const created = await ensureMonthlyIncome(supabase, user!.id, p, txList);
-  if (created) {
-    const { data: refreshed } = await supabase
-      .from("transactions")
-      .select("*")
-      .eq("user_id", user!.id)
-      .order("date", { ascending: false });
-    txList = (refreshed || []) as Transaction[];
-  }
+  const txList = (transactions || []) as Transaction[];
 
   const { start, end } = currentMonthRange();
-  const stats = calcMonthStats(p, fixedList, txList, start, end);
+  const stats = calcMonthStats(p, txList, start, end);
   const monthExpenses = txList.filter(
     (t) => t.type === "expense" && t.date >= start && t.date <= end
   );
-  const byCategory = expensesByCategory(fixedList, monthExpenses);
+  const byCategory = expensesByCategory(monthExpenses);
   const evolution = monthlyEvolution(p, txList, 6);
   const monthLabel = new Date().toLocaleDateString("es-ES", {
     month: "long",
@@ -105,7 +87,7 @@ export default async function DashboardPage() {
           large
           title="Patrimonio total"
           value={stats.patrimonioTotal}
-          hint="Ahorro + inversiones + ingresos − gastos (las inversiones no restan aquí)"
+          hint="Ahorro + inversiones + ingresos − gastos (fijos incluidos como movimientos)"
           icon={Landmark}
           tone="accent"
           className="sm:col-span-2"

@@ -1,6 +1,12 @@
 export const AUTO_SALARY_DESCRIPTION = "Ingreso mensual (automático)";
 export const AUTO_SALARY_CATEGORY = "Ingreso habitual";
 
+export const AUTO_FIXED_DESCRIPTION_PREFIX = "Gasto fijo (automático)";
+
+export function autoFixedDescription(name: string) {
+  return `${AUTO_FIXED_DESCRIPTION_PREFIX}: ${name}`;
+}
+
 export const EXPENSE_CATEGORIES = [
   "Comida",
   "Transporte",
