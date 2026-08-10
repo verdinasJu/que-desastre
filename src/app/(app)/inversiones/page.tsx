@@ -34,6 +34,7 @@ export default async function InversionesPage() {
       <InvestmentsClient
         initialPositions={(positions || []) as InvestmentPosition[]}
         currency={p?.currency || "EUR"}
+        initialInvestments={Number(p?.initial_investments) || 0}
       />
     </div>
   );

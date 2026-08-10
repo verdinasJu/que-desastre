@@ -1,9 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
 import { ensureMonthlyIncome } from "@/lib/auto-income";
 import { ensureFixedExpenseTransactions } from "@/lib/auto-fixed-expenses";
+import { ensureInvestmentPrices } from "@/lib/auto-investment-prices";
 import type { FixedExpense, Profile, Transaction } from "@/lib/types";
 
-/** Sincroniza ingreso y gastos fijos automáticos en cada visita a la app. */
+/** Sincroniza ingreso, fijos y precios de inversiones en cada visita a la app. */
 export async function AutoFinanceSync() {
   const supabase = await createClient();
   const {
@@ -43,6 +44,7 @@ export async function AutoFinanceSync() {
     fixedList,
     txList
   );
+  await ensureInvestmentPrices(supabase, user.id);
 
   return null;
 }

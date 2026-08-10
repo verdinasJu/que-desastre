@@ -26,6 +26,8 @@ import type { AssetKind, InvestmentPosition } from "@/lib/types";
 interface InvestmentsClientProps {
   initialPositions: InvestmentPosition[];
   currency?: string;
+  /** Valor de Ajustes / onboarding; se ignora cuando hay posiciones. */
+  initialInvestments?: number;
 }
 
 const KINDS: { value: AssetKind; label: string }[] = [
@@ -38,6 +40,7 @@ const KINDS: { value: AssetKind; label: string }[] = [
 export function InvestmentsClient({
   initialPositions,
   currency = "EUR",
+  initialInvestments = 0,
 }: InvestmentsClientProps) {
   const router = useRouter();
   const [positions, setPositions] = useState(initialPositions);
@@ -55,6 +58,74 @@ export function InvestmentsClient({
   useEffect(() => {
     setPositions(initialPositions);
   }, [initialPositions]);
+
+  // Al abrir Inversiones, refresca precios (además del sync del layout)
+  useEffect(() => {
+    if (!initialPositions.length) return;
+    let cancelled = false;
+    (async () => {
+      const priced = initialPositions.filter(
+        (p) => p.symbol && p.asset_kind !== "other" && p.manual_value == null
+      );
+      if (!priced.length) return;
+      try {
+        const res = await fetch("/api/prices", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            items: priced.map((p) => ({
+              id: p.id,
+              asset_kind: p.asset_kind,
+              symbol: p.symbol,
+            })),
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok || cancelled) return;
+
+        const supabase = createClient();
+        const now = new Date().toISOString();
+        const updated = [...initialPositions];
+        let changed = false;
+
+        for (const quote of data.quotes || []) {
+          const idx = updated.findIndex((p) => p.id === quote.id);
+          if (idx < 0) continue;
+          const pos = updated[idx];
+          const price = quote.priceEur != null ? Number(quote.priceEur) : null;
+          if (price == null || price <= 0) continue;
+          const value = Math.round(Number(pos.quantity) * price * 100) / 100;
+          const { data: row, error } = await supabase
+            .from("investment_positions")
+            .update({
+              last_price: price,
+              last_value: value,
+              priced_at: now,
+              updated_at: now,
+            })
+            .eq("id", pos.id)
+            .select()
+            .single();
+          if (!error && row) {
+            updated[idx] = row as InvestmentPosition;
+            changed = true;
+          }
+        }
+
+        if (changed && !cancelled) {
+          setPositions(updated);
+          router.refresh();
+        }
+      } catch {
+        /* silencioso: el botón manual sigue disponible */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // solo al montar / cambiar lista inicial
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialPositions.map((p) => p.id).join(",")]);
 
   const totals = useMemo(() => {
     let cost = 0;
@@ -252,6 +323,32 @@ export function InvestmentsClient({
           <CardTitle className="text-base">Resumen de cartera</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
+          {initialInvestments > 0 ? (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs leading-relaxed text-amber-950">
+              {positions.length === 0 ? (
+                <>
+                  Ahora el patrimonio usa{" "}
+                  <strong>
+                    {formatCurrency(initialInvestments, currency)}
+                  </strong>{" "}
+                  de Ajustes (inversión inicial). Cuando añadas la{" "}
+                  <strong>primera</strong> posición, pasará a usar{" "}
+                  <strong>solo</strong> esta cartera (no se suman las dos).
+                  Añade BTC + XRP + MSCI completos y luego pon inversión
+                  inicial a <strong>0</strong> en Ajustes.
+                </>
+              ) : (
+                <>
+                  La cartera ya manda en el patrimonio. En Ajustes aún tienes{" "}
+                  <strong>
+                    {formatCurrency(initialInvestments, currency)}
+                  </strong>{" "}
+                  de inversión inicial (ya no se usa). Ponlo a{" "}
+                  <strong>0</strong> para no liarte.
+                </>
+              )}
+            </div>
+          ) : null}
           <div className="grid grid-cols-2 gap-3">
             <div className="rounded-2xl bg-surface-2/80 px-3 py-3">
               <p className="text-[11px] text-ink-muted">Lo metido</p>
