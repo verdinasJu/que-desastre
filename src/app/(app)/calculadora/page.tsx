@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { CompoundCalculator } from "@/components/CompoundCalculator";
-import type { Profile } from "@/lib/types";
+import { calcInvestmentsMarketValue } from "@/lib/stats";
+import type { InvestmentPosition, Profile } from "@/lib/types";
 
 export default async function CalculadoraPage() {
   const supabase = await createClient();
@@ -8,14 +9,19 @@ export default async function CalculadoraPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("id", user!.id)
-    .single();
+  const [{ data: profile }, { data: positions }] = await Promise.all([
+    supabase.from("profiles").select("*").eq("id", user!.id).single(),
+    supabase
+      .from("investment_positions")
+      .select("*")
+      .eq("user_id", user!.id),
+  ]);
 
   const p = profile as Profile | null;
-  const invested = Number(p?.initial_investments || 0);
+  const invested = calcInvestmentsMarketValue(
+    p || ({ initial_investments: 0 } as Profile),
+    (positions || []) as InvestmentPosition[]
+  );
 
   return (
     <div className="space-y-5">

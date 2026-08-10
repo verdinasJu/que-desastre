@@ -46,5 +46,25 @@ export async function AutoFinanceSync() {
   );
   await ensureInvestmentPrices(supabase, user.id);
 
+  // Si ya hay cartera, limpiar el legado "inversión inicial" para no duplicar
+  const { data: positions } = await supabase
+    .from("investment_positions")
+    .select("id")
+    .eq("user_id", user.id)
+    .limit(1);
+
+  if (
+    positions?.length &&
+    Number((profile as Profile).initial_investments) > 0
+  ) {
+    await supabase
+      .from("profiles")
+      .update({
+        initial_investments: 0,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", user.id);
+  }
+
   return null;
 }

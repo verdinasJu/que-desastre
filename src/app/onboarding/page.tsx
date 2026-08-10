@@ -21,7 +21,6 @@ export default function OnboardingPage() {
   const [salary, setSalary] = useState("");
   const [payday, setPayday] = useState("1");
   const [savings, setSavings] = useState("");
-  const [investments, setInvestments] = useState("");
   const [fixed, setFixed] = useState<FixedDraft[]>([
     { name: "Alquiler", amount: "", category: "Vivienda" },
     { name: "Teléfono", amount: "", category: "Servicios" },
@@ -52,7 +51,7 @@ export default function OnboardingPage() {
         monthly_salary: Number(salary.replace(",", ".")) || 0,
         payday_day: Math.min(28, Math.max(1, Number(payday) || 1)),
         initial_savings: Number(savings.replace(",", ".")) || 0,
-        initial_investments: Number(investments.replace(",", ".")) || 0,
+        initial_investments: 0,
         currency: "EUR",
         onboarding_completed: true,
         onboarding_completed_at: new Date().toISOString(),
@@ -164,10 +163,9 @@ export default function OnboardingPage() {
               Tu patrimonio actual
             </h1>
             <p className="text-sm text-ink-muted">
-              El ahorro forma tu patrimonio base. Las inversiones detalladas
-              (BTC, fondos…) las puedes añadir después en Más → Inversiones,
-              con lo metido y el valor actual. Aquí puedes poner un total
-              aproximado si quieres.
+              Indica tu ahorro / liquidez (cuenta, efectivo). Las inversiones
+              (BTC, XRP, fondos…) las añadirás en Más → Inversiones, con lo
+              metido y el valor actual.
             </p>
             <div className="space-y-2">
               <Label htmlFor="savings">Ahorro actual (€)</Label>
@@ -178,22 +176,6 @@ export default function OnboardingPage() {
                 value={savings}
                 onChange={(e) => setSavings(e.target.value)}
               />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="investments">
-                Inversiones aproximadas (€) — opcional
-              </Label>
-              <Input
-                id="investments"
-                inputMode="decimal"
-                placeholder="5000"
-                value={investments}
-                onChange={(e) => setInvestments(e.target.value)}
-              />
-              <p className="text-xs text-ink-muted leading-relaxed">
-                Si luego creas posiciones en Inversiones, el patrimonio usará
-                el valor de mercado de esas posiciones (puede subir o bajar).
-              </p>
             </div>
           </>
         )}

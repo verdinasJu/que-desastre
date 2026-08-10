@@ -110,7 +110,7 @@ export default async function DashboardPage() {
           large
           title="Patrimonio total"
           value={stats.patrimonioTotal}
-          hint="Ahorro + valor de cartera (o inversión inicial) + ingresos − gastos − fijos pendientes"
+          hint="Ahorro + cartera de inversiones + ingresos − gastos − fijos pendientes"
           icon={Landmark}
           tone="accent"
           className="sm:col-span-2"

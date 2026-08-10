@@ -21,7 +21,6 @@ export default function AjustesPage() {
   const [payday, setPayday] = useState("1");
   const [hoursMonth, setHoursMonth] = useState("160");
   const [savings, setSavings] = useState("");
-  const [investments, setInvestments] = useState("");
   const [newName, setNewName] = useState("");
   const [newAmount, setNewAmount] = useState("");
   const [saving, setSaving] = useState(false);
@@ -50,7 +49,6 @@ export default function AjustesPage() {
         setPayday(String(profileData.payday_day ?? 1));
         setHoursMonth(String(profileData.hours_per_month ?? 160));
         setSavings(String(profileData.initial_savings));
-        setInvestments(String(profileData.initial_investments));
       }
       setFixed((f || []) as FixedExpense[]);
     }
@@ -68,7 +66,6 @@ export default function AjustesPage() {
         payday_day: Math.min(28, Math.max(1, Number(payday) || 1)),
         hours_per_month: Math.max(1, Number(hoursMonth.replace(",", ".")) || 160),
         initial_savings: Number(savings.replace(",", ".")) || 0,
-        initial_investments: Number(investments.replace(",", ".")) || 0,
         updated_at: new Date().toISOString(),
       })
       .eq("id", profile.id);
@@ -205,27 +202,16 @@ export default function AjustesPage() {
             </p>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="savings">Ahorro inicial (€)</Label>
+            <Label htmlFor="savings">Ahorro / liquidez (€)</Label>
             <Input
               id="savings"
               inputMode="decimal"
               value={savings}
               onChange={(e) => setSavings(e.target.value)}
             />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="investments">
-              Inversión inicial / aproximada (€)
-            </Label>
-            <Input
-              id="investments"
-              inputMode="decimal"
-              value={investments}
-              onChange={(e) => setInvestments(e.target.value)}
-            />
             <p className="text-xs text-ink-muted leading-relaxed">
-              Se usa solo si aún no tienes posiciones en Más → Inversiones.
-              Con cartera creada, manda el valor de mercado de BTC, XRP, fondos…
+              Dinero en cuenta / efectivo. BTC, XRP y fondos van en Más →
+              Inversiones.
             </p>
           </div>
           <Button onClick={saveProfile} disabled={saving} className="w-full">

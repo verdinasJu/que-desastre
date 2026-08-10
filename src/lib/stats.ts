@@ -13,29 +13,32 @@ import {
 } from "./fixed-expense-utils";
 import { positionCurrentValue } from "./investment-prices";
 
-/** Valor de mercado de la cartera; si no hay posiciones, el valor de onboarding. */
+/** Valor de mercado de la cartera. Sin posiciones: legado initial_investments (oculto). */
 export function calcInvestmentsMarketValue(
   profile: Profile,
   positions: InvestmentPosition[] = []
 ): number {
-  if (!positions.length) return Number(profile.initial_investments) || 0;
-  return positions.reduce(
-    (acc, p) =>
-      acc +
-      positionCurrentValue({
-        quantity: Number(p.quantity),
-        last_price: p.last_price,
-        last_value: p.last_value,
-        manual_value: p.manual_value,
-      }),
-    0
-  );
+  if (positions.length) {
+    return positions.reduce(
+      (acc, p) =>
+        acc +
+        positionCurrentValue({
+          quantity: Number(p.quantity),
+          last_price: p.last_price,
+          last_value: p.last_value,
+          manual_value: p.manual_value,
+        }),
+      0
+    );
+  }
+  // Compatibilidad: usuarios que aún no migraron a la cartera
+  return Number(profile.initial_investments) || 0;
 }
 
 /**
- * Patrimonio total = ahorro inicial + valor inversiones + ingresos − gastos
+ * Patrimonio total = ahorro inicial + valor de cartera + ingresos − gastos
  * − fijos del mes aún no registrados (devengo parcial, ej. alquiler pendiente).
- * Si hay cartera en Inversiones, usa su valor de mercado (puede subir o bajar).
+ * Las inversiones viven solo en Más → Inversiones (valor de mercado).
  */
 export function calcPatrimonio(
   profile: Profile,

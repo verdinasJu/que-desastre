@@ -26,8 +26,6 @@ import type { AssetKind, InvestmentPosition } from "@/lib/types";
 interface InvestmentsClientProps {
   initialPositions: InvestmentPosition[];
   currency?: string;
-  /** Valor de Ajustes / onboarding; se ignora cuando hay posiciones. */
-  initialInvestments?: number;
 }
 
 const KINDS: { value: AssetKind; label: string }[] = [
@@ -40,7 +38,6 @@ const KINDS: { value: AssetKind; label: string }[] = [
 export function InvestmentsClient({
   initialPositions,
   currency = "EUR",
-  initialInvestments = 0,
 }: InvestmentsClientProps) {
   const router = useRouter();
   const [positions, setPositions] = useState(initialPositions);
@@ -323,32 +320,6 @@ export function InvestmentsClient({
           <CardTitle className="text-base">Resumen de cartera</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          {initialInvestments > 0 ? (
-            <div className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs leading-relaxed text-amber-950">
-              {positions.length === 0 ? (
-                <>
-                  Ahora el patrimonio usa{" "}
-                  <strong>
-                    {formatCurrency(initialInvestments, currency)}
-                  </strong>{" "}
-                  de Ajustes (inversión inicial). Cuando añadas la{" "}
-                  <strong>primera</strong> posición, pasará a usar{" "}
-                  <strong>solo</strong> esta cartera (no se suman las dos).
-                  Añade BTC + XRP + MSCI completos y luego pon inversión
-                  inicial a <strong>0</strong> en Ajustes.
-                </>
-              ) : (
-                <>
-                  La cartera ya manda en el patrimonio. En Ajustes aún tienes{" "}
-                  <strong>
-                    {formatCurrency(initialInvestments, currency)}
-                  </strong>{" "}
-                  de inversión inicial (ya no se usa). Ponlo a{" "}
-                  <strong>0</strong> para no liarte.
-                </>
-              )}
-            </div>
-          ) : null}
           <div className="grid grid-cols-2 gap-3">
             <div className="rounded-2xl bg-surface-2/80 px-3 py-3">
               <p className="text-[11px] text-ink-muted">Lo metido</p>
@@ -413,9 +384,10 @@ export function InvestmentsClient({
           <p className="text-sm text-ink-muted">
             Aún no hay posiciones. Añade BTC, XRP, tu MSCI…
           </p>
-          <p className="mt-2 text-xs text-ink-muted">
-            Indica lo que metiste y la cantidad; el valor actual se calcula con
-            el precio de mercado (o a mano).
+          <p className="mt-2 text-xs text-ink-muted leading-relaxed">
+            Hasta que añadas la cartera, el patrimonio sigue usando el valor
+            antiguo de inversiones (para no descuadrarte). En cuanto tengas
+            posiciones, solo cuenta esta pantalla.
           </p>
         </div>
       ) : (
