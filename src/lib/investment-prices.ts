@@ -8,6 +8,12 @@ export interface InvestmentPreset {
   hint: string;
 }
 
+/** ISIN conocidos → ticker Yahoo que sí cotiza. */
+const ISIN_TO_YAHOO: Record<string, string> = {
+  IE00BYX5P602: "0P0001CJGV.F", // Fidelity MSCI World P EUR Hedged Acc (TR)
+  IE00BYX5NX33: "0P0001CLDK.F", // Fidelity MSCI World P EUR Acc (sin hedge)
+};
+
 /** Presets frecuentes (Trade Republic / Europa). */
 export const INVESTMENT_PRESETS: InvestmentPreset[] = [
   {
@@ -23,16 +29,16 @@ export const INVESTMENT_PRESETS: InvestmentPreset[] = [
     hint: "Ripple · precio en vivo (CoinGecko)",
   },
   {
+    name: "Fidelity MSCI World",
+    asset_kind: "etf",
+    symbol: "0P0001CJGV.F",
+    hint: "Fidelity MSCI World EUR Hedged (el de Trade Republic)",
+  },
+  {
     name: "MSCI World (VWCE)",
     asset_kind: "etf",
     symbol: "VWCE.DE",
-    hint: "Vanguard FTSE All-World · si en TR usas otro, cambia el ticker",
-  },
-  {
-    name: "MSCI World (IWDA)",
-    asset_kind: "etf",
-    symbol: "IWDA.AS",
-    hint: "iShares Core MSCI World · Amsterdam",
+    hint: "Vanguard FTSE All-World",
   },
 ];
 
@@ -61,15 +67,61 @@ export async function fetchCryptoPricesEur(
   return out;
 }
 
+function isIsin(s: string) {
+  return /^[A-Z]{2}[A-Z0-9]{9}\d$/i.test(s.trim());
+}
+
+/** Resuelve ISIN / alias a un símbolo Yahoo usable. */
+export async function resolveYahooSymbol(input: string): Promise<string> {
+  const raw = input.trim();
+  if (!raw) return "";
+
+  const upper = raw.toUpperCase();
+  if (ISIN_TO_YAHOO[upper]) return ISIN_TO_YAHOO[upper];
+
+  if (!isIsin(upper) && !upper.includes(" ")) return raw;
+
+  try {
+    const url = `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(
+      raw
+    )}&quotesCount=8&newsCount=0`;
+    const res = await fetch(url, {
+      next: { revalidate: 3600 },
+      headers: {
+        Accept: "application/json",
+        "User-Agent": "Mozilla/5.0 QueDesastre/1.0",
+      },
+    });
+    if (!res.ok) return raw;
+    const data = await res.json();
+    const quotes = (data?.quotes || []) as {
+      symbol?: string;
+      quoteType?: string;
+    }[];
+    const fund = quotes.find(
+      (q) =>
+        q.symbol &&
+        (q.quoteType === "MUTUALFUND" ||
+          q.quoteType === "ETF" ||
+          q.symbol.includes("."))
+    );
+    if (fund?.symbol) return fund.symbol;
+    if (quotes[0]?.symbol) return quotes[0].symbol;
+  } catch {
+    /* fallback */
+  }
+  return raw;
+}
+
 /** Precio de un ticker vía Yahoo Finance chart (sin API key). */
 export async function fetchYahooPriceEur(
   ticker: string
 ): Promise<number | null> {
-  const symbol = ticker.trim().toUpperCase();
-  if (!symbol) return null;
+  const resolved = await resolveYahooSymbol(ticker);
+  if (!resolved) return null;
 
   const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(
-    symbol
+    resolved
   )}?interval=1d&range=1d`;
 
   try {
@@ -92,7 +144,6 @@ export async function fetchYahooPriceEur(
     const currency = String(meta?.currency || "EUR").toUpperCase();
     if (currency === "EUR") return price;
 
-    // Conversión aproximada USD/GBP → EUR si hace falta
     if (currency === "USD" || currency === "GBP") {
       const fx = await fetchFxToEur(currency);
       return fx ? price * fx : null;
@@ -151,7 +202,11 @@ export async function fetchPricesForPositions(
       continue;
     }
 
-    if (item.asset_kind === "etf" || item.asset_kind === "stock") {
+    if (
+      item.asset_kind === "etf" ||
+      item.asset_kind === "stock" ||
+      item.asset_kind === "other"
+    ) {
       const p = await fetchYahooPriceEur(symbol);
       results.push({
         symbol,
@@ -167,15 +222,13 @@ export async function fetchPricesForPositions(
   return results;
 }
 
+/** Valor = cantidad × último precio API (o último valor cacheado). Sin manual. */
 export function positionCurrentValue(opts: {
   quantity: number;
   last_price: number | null | undefined;
   last_value: number | null | undefined;
-  manual_value: number | null | undefined;
+  manual_value?: number | null | undefined;
 }): number {
-  if (opts.manual_value != null && Number(opts.manual_value) >= 0) {
-    return Number(opts.manual_value);
-  }
   const qty = Number(opts.quantity) || 0;
   const price = Number(opts.last_price);
   if (qty > 0 && price > 0) return qty * price;

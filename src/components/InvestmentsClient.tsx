@@ -43,7 +43,6 @@ function emptyForm() {
     symbol: "",
     quantity: "",
     costBasis: "",
-    currentValue: "",
   };
 }
 
@@ -67,9 +66,7 @@ export function InvestmentsClient({
     if (!initialPositions.length) return;
     let cancelled = false;
     (async () => {
-      const priced = initialPositions.filter(
-        (p) => p.symbol && p.asset_kind !== "other" && p.manual_value == null
-      );
+      const priced = initialPositions.filter((p) => p.symbol);
       if (!priced.length) return;
       try {
         const res = await fetch("/api/prices", {
@@ -103,6 +100,7 @@ export function InvestmentsClient({
             .update({
               last_price: price,
               last_value: value,
+              manual_value: null,
               priced_at: now,
               updated_at: now,
             })
@@ -120,7 +118,7 @@ export function InvestmentsClient({
           router.refresh();
         }
       } catch {
-        /* botón Actualizar sigue disponible */
+        /* ok */
       }
     })();
     return () => {
@@ -138,20 +136,15 @@ export function InvestmentsClient({
         quantity: Number(p.quantity),
         last_price: p.last_price,
         last_value: p.last_value,
-        manual_value: p.manual_value,
       });
     }
     return { cost, value, pnl: value - cost };
   }, [positions]);
 
   const refreshPrices = useCallback(async () => {
-    const priced = positions.filter(
-      (p) => p.symbol && p.asset_kind !== "other"
-    );
+    const priced = positions.filter((p) => p.symbol);
     if (!priced.length) {
-      toast.message(
-        "Nada con símbolo API. Edita el valor actual de fondos sin ticker."
-      );
+      toast.message("Añade un símbolo a cada posición para precio automático");
       return;
     }
 
@@ -174,6 +167,7 @@ export function InvestmentsClient({
       const supabase = createClient();
       const now = new Date().toISOString();
       const updated: InvestmentPosition[] = [...positions];
+      let ok = 0;
 
       for (const quote of data.quotes || []) {
         const idx = updated.findIndex((p) => p.id === quote.id);
@@ -198,11 +192,14 @@ export function InvestmentsClient({
 
         if (!error && row) {
           updated[idx] = row as InvestmentPosition;
+          ok += 1;
         }
       }
 
       setPositions(updated);
-      toast.success("Precios actualizados");
+      toast.success(
+        ok ? `Precios actualizados (${ok})` : "No se pudo obtener ningún precio"
+      );
       router.refresh();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "No se pudo actualizar");
@@ -218,12 +215,6 @@ export function InvestmentsClient({
   }
 
   function openEdit(p: InvestmentPosition) {
-    const current = positionCurrentValue({
-      quantity: Number(p.quantity),
-      last_price: p.last_price,
-      last_value: p.last_value,
-      manual_value: p.manual_value,
-    });
     setEditing(p);
     setForm({
       name: p.name,
@@ -231,7 +222,6 @@ export function InvestmentsClient({
       symbol: p.symbol || "",
       quantity: String(p.quantity),
       costBasis: String(p.cost_basis),
-      currentValue: current ? String(current) : "",
     });
     setSheetOpen(true);
   }
@@ -254,24 +244,18 @@ export function InvestmentsClient({
   async function savePosition() {
     const qty = Number(form.quantity.replace(",", "."));
     const cost = Number(form.costBasis.replace(",", "."));
-    const currentRaw = form.currentValue.trim();
-    const currentNum = currentRaw
-      ? Number(currentRaw.replace(",", "."))
-      : null;
+    const sym = form.symbol.trim();
 
     if (!form.name.trim()) {
       toast.error("Pon un nombre");
       return;
     }
-    if (!(qty >= 0) || Number.isNaN(qty) || !(cost >= 0) || Number.isNaN(cost)) {
-      toast.error("Cantidad y lo metido deben ser números ≥ 0");
+    if (!sym) {
+      toast.error("El símbolo es obligatorio para actualizar el precio solo");
       return;
     }
-    if (
-      currentNum != null &&
-      (Number.isNaN(currentNum) || currentNum < 0)
-    ) {
-      toast.error("Valor actual inválido");
+    if (!(qty > 0) || Number.isNaN(qty) || !(cost >= 0) || Number.isNaN(cost)) {
+      toast.error("Cantidad > 0 y lo metido ≥ 0");
       return;
     }
 
@@ -286,40 +270,34 @@ export function InvestmentsClient({
     }
 
     let lastPrice: number | null = null;
-    let lastValue: number | null = currentNum;
+    let lastValue: number | null = null;
     let pricedAt: string | null = null;
-    const sym = form.symbol.trim() || null;
 
-    // Si hay símbolo y no forzaron valor actual, intentar API
-    if (currentNum == null && sym && form.kind !== "other") {
-      try {
-        const res = await fetch("/api/prices", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            items: [{ asset_kind: form.kind, symbol: sym }],
-          }),
-        });
-        const data = await res.json();
-        const price = data?.quotes?.[0]?.priceEur;
-        if (typeof price === "number" && price > 0) {
-          lastPrice = price;
-          lastValue = Math.round(qty * price * 100) / 100;
-          pricedAt = new Date().toISOString();
-        }
-      } catch {
-        /* ok */
+    try {
+      const res = await fetch("/api/prices", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          items: [{ asset_kind: form.kind, symbol: sym }],
+        }),
+      });
+      const data = await res.json();
+      const price = data?.quotes?.[0]?.priceEur;
+      if (typeof price === "number" && price > 0) {
+        lastPrice = price;
+        lastValue = Math.round(qty * price * 100) / 100;
+        pricedAt = new Date().toISOString();
       }
+    } catch {
+      /* ok */
     }
 
-    // Valor actual escrito a mano (fondos sin ticker, correcciones)
-    if (currentNum != null) {
-      lastValue = Math.round(currentNum * 100) / 100;
-      lastPrice = null;
-      pricedAt = new Date().toISOString();
-    } else if (lastValue == null) {
-      // Sin API: empezar por lo metido hasta que editen el valor
-      lastValue = cost;
+    if (lastPrice == null) {
+      setLoading(false);
+      toast.error(
+        "No se pudo obtener el precio de ese símbolo. Revisa el ticker (ej. bitcoin, 0P0001CJGV.F)."
+      );
+      return;
     }
 
     const payload = {
@@ -452,18 +430,17 @@ export function InvestmentsClient({
               Añadir
             </Button>
           </div>
+          <p className="text-[11px] leading-relaxed text-ink-muted">
+            Los precios se actualizan solos al abrir la app (CoinGecko /
+            Yahoo). Valor ahora = cantidad × precio de mercado.
+          </p>
         </CardContent>
       </Card>
 
       {positions.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-line bg-surface/50 px-4 py-10 text-center">
           <p className="text-sm text-ink-muted">
-            Aún no hay posiciones. Añade BTC, XRP, tu MSCI…
-          </p>
-          <p className="mt-2 text-xs text-ink-muted leading-relaxed">
-            Hasta que añadas la cartera, el patrimonio sigue usando el valor
-            antiguo de inversiones. En cuanto tengas posiciones, solo cuenta
-            esta pantalla.
+            Aún no hay posiciones. Añade BTC, XRP o Fidelity MSCI…
           </p>
         </div>
       ) : (
@@ -473,7 +450,6 @@ export function InvestmentsClient({
               quantity: Number(p.quantity),
               last_price: p.last_price,
               last_value: p.last_value,
-              manual_value: p.manual_value,
             });
             const cost = Number(p.cost_basis) || 0;
             const pnl = value - cost;
@@ -571,11 +547,7 @@ export function InvestmentsClient({
         open={sheetOpen}
         onClose={closeSheet}
         title={isEdit ? "Editar inversión" : "Nueva inversión"}
-        subtitle={
-          isEdit
-            ? "Corrige cantidad, lo metido o el valor actual"
-            : "Cantidad + lo metido; el valor ahora sale del precio o al editar"
-        }
+        subtitle="Solo cantidad + lo metido; el valor ahora viene de la API"
       >
         <div className="space-y-4 pb-2">
           {!isEdit ? (
@@ -627,17 +599,19 @@ export function InvestmentsClient({
           </div>
 
           <div className="space-y-2">
-            <Label>Símbolo (opcional, para precio automático)</Label>
+            <Label>Símbolo (obligatorio)</Label>
             <Input
               value={form.symbol}
               onChange={(e) =>
                 setForm((f) => ({ ...f, symbol: e.target.value }))
               }
-              placeholder={form.kind === "crypto" ? "bitcoin" : "VWCE.DE"}
+              placeholder={
+                form.kind === "crypto" ? "bitcoin" : "0P0001CJGV.F"
+              }
             />
             <p className="text-[11px] text-ink-muted leading-relaxed">
-              BTC/XRP: bitcoin, ripple. Fondos sin ticker: déjalo vacío y pon
-              el valor actual abajo.
+              Crypto: bitcoin, ripple. Tu fondo TR: usa el chip{" "}
+              <strong>Fidelity MSCI World</strong> (ticker automático).
             </p>
           </div>
 
@@ -666,36 +640,17 @@ export function InvestmentsClient({
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label>
-              Valor actual (€){isEdit ? "" : " — opcional"}
-            </Label>
-            <Input
-              inputMode="decimal"
-              value={form.currentValue}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, currentValue: e.target.value }))
-              }
-              placeholder={
-                isEdit
-                  ? "Lo que ves en Trade Republic"
-                  : "Vacío = precio API o lo metido"
-              }
-            />
-            <p className="text-[11px] text-ink-muted leading-relaxed">
-              {isEdit
-                ? "Úsalo sobre todo en fondos sin símbolo (ej. Fidelity MSCI)."
-                : "En crypto con símbolo suele bastar dejarlo vacío."}
-            </p>
-          </div>
-
           <Button
             type="button"
             className="w-full"
             disabled={loading}
             onClick={() => void savePosition()}
           >
-            {loading ? "Guardando…" : isEdit ? "Guardar cambios" : "Guardar inversión"}
+            {loading
+              ? "Obteniendo precio…"
+              : isEdit
+                ? "Guardar cambios"
+                : "Guardar inversión"}
           </Button>
         </div>
       </AppSheet>

@@ -11,7 +11,7 @@ function isStale(pricedAt: string | null | undefined) {
 
 /**
  * Actualiza precios de la cartera si están caducados (inicio / cualquier página).
- * No toca posiciones con valor manual.
+ * Todo vía API (cantidad × precio). Sin valores manuales.
  */
 export async function ensureInvestmentPrices(
   supabase: SupabaseClient,
@@ -27,18 +27,11 @@ export async function ensureInvestmentPrices(
     positions = (data || []) as InvestmentPosition[];
   }
 
-  const toUpdate = positions.filter(
-    (p) =>
-      p.symbol &&
-      p.asset_kind !== "other" &&
-      p.manual_value == null &&
-      isStale(p.priced_at)
-  );
-
-  if (!toUpdate.length) return false;
+  const list = positions.filter((p) => p.symbol && isStale(p.priced_at));
+  if (!list.length) return false;
 
   const quotes = await fetchPricesForPositions(
-    toUpdate.map((p) => ({
+    list.map((p) => ({
       asset_kind: p.asset_kind,
       symbol: p.symbol,
     }))
@@ -47,8 +40,8 @@ export async function ensureInvestmentPrices(
   const now = new Date().toISOString();
   let any = false;
 
-  for (let i = 0; i < toUpdate.length; i++) {
-    const pos = toUpdate[i];
+  for (let i = 0; i < list.length; i++) {
+    const pos = list[i];
     const price = quotes[i]?.priceEur;
     if (price == null || price <= 0) continue;
 
@@ -58,6 +51,7 @@ export async function ensureInvestmentPrices(
       .update({
         last_price: price,
         last_value: value,
+        manual_value: null,
         priced_at: now,
         updated_at: now,
       })
