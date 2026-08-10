@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   Plus,
   Trash2,
+  Pencil,
   RefreshCw,
   TrendingDown,
   TrendingUp,
@@ -35,28 +36,33 @@ const KINDS: { value: AssetKind; label: string }[] = [
   { value: "other", label: "Otro" },
 ];
 
+function emptyForm() {
+  return {
+    name: "",
+    kind: "crypto" as AssetKind,
+    symbol: "",
+    quantity: "",
+    costBasis: "",
+    currentValue: "",
+  };
+}
+
 export function InvestmentsClient({
   initialPositions,
   currency = "EUR",
 }: InvestmentsClientProps) {
   const router = useRouter();
   const [positions, setPositions] = useState(initialPositions);
-  const [open, setOpen] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [editing, setEditing] = useState<InvestmentPosition | null>(null);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-
-  const [name, setName] = useState("");
-  const [kind, setKind] = useState<AssetKind>("crypto");
-  const [symbol, setSymbol] = useState("");
-  const [quantity, setQuantity] = useState("");
-  const [costBasis, setCostBasis] = useState("");
-  const [manualValue, setManualValue] = useState("");
+  const [form, setForm] = useState(emptyForm());
 
   useEffect(() => {
     setPositions(initialPositions);
   }, [initialPositions]);
 
-  // Al abrir Inversiones, refresca precios (además del sync del layout)
   useEffect(() => {
     if (!initialPositions.length) return;
     let cancelled = false;
@@ -114,13 +120,12 @@ export function InvestmentsClient({
           router.refresh();
         }
       } catch {
-        /* silencioso: el botón manual sigue disponible */
+        /* botón Actualizar sigue disponible */
       }
     })();
     return () => {
       cancelled = true;
     };
-    // solo al montar / cambiar lista inicial
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialPositions.map((p) => p.id).join(",")]);
 
@@ -141,10 +146,12 @@ export function InvestmentsClient({
 
   const refreshPrices = useCallback(async () => {
     const priced = positions.filter(
-      (p) => p.symbol && p.asset_kind !== "other" && p.manual_value == null
+      (p) => p.symbol && p.asset_kind !== "other"
     );
     if (!priced.length) {
-      toast.message("Nada que actualizar (usa valor manual o añade símbolo)");
+      toast.message(
+        "Nada con símbolo API. Edita el valor actual de fondos sin ticker."
+      );
       return;
     }
 
@@ -181,6 +188,7 @@ export function InvestmentsClient({
           .update({
             last_price: price,
             last_value: Math.round(value * 100) / 100,
+            manual_value: null,
             priced_at: now,
             updated_at: now,
           })
@@ -203,29 +211,67 @@ export function InvestmentsClient({
     }
   }, [positions, router]);
 
-  function applyPreset(preset: (typeof INVESTMENT_PRESETS)[number]) {
-    setName(preset.name);
-    setKind(preset.asset_kind);
-    setSymbol(preset.symbol);
+  function openCreate() {
+    setEditing(null);
+    setForm(emptyForm());
+    setSheetOpen(true);
   }
 
-  async function addPosition() {
-    const qty = Number(quantity.replace(",", "."));
-    const cost = Number(costBasis.replace(",", "."));
-    const manual = manualValue.trim()
-      ? Number(manualValue.replace(",", "."))
+  function openEdit(p: InvestmentPosition) {
+    const current = positionCurrentValue({
+      quantity: Number(p.quantity),
+      last_price: p.last_price,
+      last_value: p.last_value,
+      manual_value: p.manual_value,
+    });
+    setEditing(p);
+    setForm({
+      name: p.name,
+      kind: p.asset_kind,
+      symbol: p.symbol || "",
+      quantity: String(p.quantity),
+      costBasis: String(p.cost_basis),
+      currentValue: current ? String(current) : "",
+    });
+    setSheetOpen(true);
+  }
+
+  function closeSheet() {
+    setSheetOpen(false);
+    setEditing(null);
+    setForm(emptyForm());
+  }
+
+  function applyPreset(preset: (typeof INVESTMENT_PRESETS)[number]) {
+    setForm((f) => ({
+      ...f,
+      name: preset.name,
+      kind: preset.asset_kind,
+      symbol: preset.symbol,
+    }));
+  }
+
+  async function savePosition() {
+    const qty = Number(form.quantity.replace(",", "."));
+    const cost = Number(form.costBasis.replace(",", "."));
+    const currentRaw = form.currentValue.trim();
+    const currentNum = currentRaw
+      ? Number(currentRaw.replace(",", "."))
       : null;
 
-    if (!name.trim()) {
+    if (!form.name.trim()) {
       toast.error("Pon un nombre");
       return;
     }
-    if (!(qty >= 0) || !(cost >= 0)) {
+    if (!(qty >= 0) || Number.isNaN(qty) || !(cost >= 0) || Number.isNaN(cost)) {
       toast.error("Cantidad y lo metido deben ser números ≥ 0");
       return;
     }
-    if (manual != null && (!(manual >= 0) || Number.isNaN(manual))) {
-      toast.error("Valor manual inválido");
+    if (
+      currentNum != null &&
+      (Number.isNaN(currentNum) || currentNum < 0)
+    ) {
+      toast.error("Valor actual inválido");
       return;
     }
 
@@ -240,16 +286,18 @@ export function InvestmentsClient({
     }
 
     let lastPrice: number | null = null;
-    let lastValue: number | null = manual;
+    let lastValue: number | null = currentNum;
     let pricedAt: string | null = null;
+    const sym = form.symbol.trim() || null;
 
-    if (manual == null && symbol.trim() && kind !== "other") {
+    // Si hay símbolo y no forzaron valor actual, intentar API
+    if (currentNum == null && sym && form.kind !== "other") {
       try {
         const res = await fetch("/api/prices", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            items: [{ asset_kind: kind, symbol: symbol.trim() }],
+            items: [{ asset_kind: form.kind, symbol: sym }],
           }),
         });
         const data = await res.json();
@@ -260,41 +308,67 @@ export function InvestmentsClient({
           pricedAt = new Date().toISOString();
         }
       } catch {
-        /* se podrá refrescar luego */
+        /* ok */
       }
     }
 
-    const { data, error } = await supabase
-      .from("investment_positions")
-      .insert({
-        user_id: user.id,
-        name: name.trim(),
-        asset_kind: kind,
-        symbol: symbol.trim() || null,
-        quantity: qty,
-        cost_basis: cost,
-        manual_value: manual,
-        last_price: lastPrice,
-        last_value: lastValue,
-        priced_at: pricedAt,
-      })
-      .select()
-      .single();
-
-    setLoading(false);
-    if (error) {
-      toast.error(error.message);
-      return;
+    // Valor actual escrito a mano (fondos sin ticker, correcciones)
+    if (currentNum != null) {
+      lastValue = Math.round(currentNum * 100) / 100;
+      lastPrice = null;
+      pricedAt = new Date().toISOString();
+    } else if (lastValue == null) {
+      // Sin API: empezar por lo metido hasta que editen el valor
+      lastValue = cost;
     }
 
-    setPositions((prev) => [data as InvestmentPosition, ...prev]);
-    setName("");
-    setSymbol("");
-    setQuantity("");
-    setCostBasis("");
-    setManualValue("");
-    setOpen(false);
-    toast.success("Inversión añadida");
+    const payload = {
+      name: form.name.trim(),
+      asset_kind: form.kind,
+      symbol: sym,
+      quantity: qty,
+      cost_basis: cost,
+      manual_value: null,
+      last_price: lastPrice,
+      last_value: lastValue,
+      priced_at: pricedAt,
+      updated_at: new Date().toISOString(),
+    };
+
+    if (editing) {
+      const { data, error } = await supabase
+        .from("investment_positions")
+        .update(payload)
+        .eq("id", editing.id)
+        .select()
+        .single();
+
+      setLoading(false);
+      if (error) {
+        toast.error(error.message);
+        return;
+      }
+      setPositions((prev) =>
+        prev.map((p) => (p.id === editing.id ? (data as InvestmentPosition) : p))
+      );
+      toast.success("Inversión actualizada");
+    } else {
+      const { data, error } = await supabase
+        .from("investment_positions")
+        .insert({ ...payload, user_id: user.id })
+        .select()
+        .single();
+
+      setLoading(false);
+      if (error) {
+        toast.error(error.message);
+        return;
+      }
+      setPositions((prev) => [data as InvestmentPosition, ...prev]);
+      toast.success("Inversión añadida");
+    }
+
+    closeSheet();
     router.refresh();
   }
 
@@ -312,6 +386,8 @@ export function InvestmentsClient({
     toast.success("Eliminada");
     router.refresh();
   }
+
+  const isEdit = editing != null;
 
   return (
     <div className="space-y-4">
@@ -371,7 +447,7 @@ export function InvestmentsClient({
               />
               Actualizar precios
             </Button>
-            <Button type="button" className="flex-1" onClick={() => setOpen(true)}>
+            <Button type="button" className="flex-1" onClick={openCreate}>
               <Plus className="mr-2 h-4 w-4" />
               Añadir
             </Button>
@@ -386,8 +462,8 @@ export function InvestmentsClient({
           </p>
           <p className="mt-2 text-xs text-ink-muted leading-relaxed">
             Hasta que añadas la cartera, el patrimonio sigue usando el valor
-            antiguo de inversiones (para no descuadrarte). En cuanto tengas
-            posiciones, solo cuenta esta pantalla.
+            antiguo de inversiones. En cuanto tengas posiciones, solo cuenta
+            esta pantalla.
           </p>
         </div>
       ) : (
@@ -407,7 +483,11 @@ export function InvestmentsClient({
                 className="rounded-2xl border border-line/70 bg-surface px-3 py-3 shadow-sm"
               >
                 <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
+                  <button
+                    type="button"
+                    className="min-w-0 flex-1 text-left"
+                    onClick={() => openEdit(p)}
+                  >
                     <p className="truncate text-sm font-semibold text-ink">
                       {p.name}
                     </p>
@@ -417,17 +497,29 @@ export function InvestmentsClient({
                       {" · "}
                       {Number(p.quantity)} uds
                     </p>
+                  </button>
+                  <div className="flex shrink-0 items-center">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-ink-faint hover:text-brand"
+                      onClick={() => openEdit(p)}
+                      aria-label="Editar"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-ink-faint hover:text-rose-600"
+                      onClick={() => void removePosition(p.id)}
+                      aria-label="Eliminar"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 shrink-0 text-ink-faint hover:text-rose-600"
-                    onClick={() => void removePosition(p.id)}
-                    aria-label="Eliminar"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
                 </div>
                 <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
                   <div>
@@ -457,21 +549,16 @@ export function InvestmentsClient({
                 </div>
                 {p.priced_at ? (
                   <p className="mt-1.5 text-[10px] text-ink-faint">
-                    Precio{" "}
                     {p.last_price != null
-                      ? formatCurrency(Number(p.last_price), currency)
-                      : "—"}{" "}
-                    · actualizado{" "}
+                      ? `Precio ${formatCurrency(Number(p.last_price), currency)} · `
+                      : ""}
+                    actualizado{" "}
                     {new Date(p.priced_at).toLocaleString("es-ES", {
                       day: "2-digit",
                       month: "short",
                       hour: "2-digit",
                       minute: "2-digit",
                     })}
-                  </p>
-                ) : p.manual_value != null ? (
-                  <p className="mt-1.5 text-[10px] text-ink-faint">
-                    Valor manual (sin API)
                   </p>
                 ) : null}
               </li>
@@ -481,33 +568,39 @@ export function InvestmentsClient({
       )}
 
       <AppSheet
-        open={open}
-        onClose={() => setOpen(false)}
-        title="Nueva inversión"
-        subtitle="Lo metido vs valor ahora (puede subir o bajar)"
+        open={sheetOpen}
+        onClose={closeSheet}
+        title={isEdit ? "Editar inversión" : "Nueva inversión"}
+        subtitle={
+          isEdit
+            ? "Corrige cantidad, lo metido o el valor actual"
+            : "Cantidad + lo metido; el valor ahora sale del precio o al editar"
+        }
       >
         <div className="space-y-4 pb-2">
-          <div>
-            <p className="mb-2 text-xs font-medium text-ink-muted">Rápido</p>
-            <div className="flex flex-wrap gap-2">
-              {INVESTMENT_PRESETS.map((preset) => (
-                <button
-                  key={preset.symbol}
-                  type="button"
-                  onClick={() => applyPreset(preset)}
-                  className="rounded-full border border-line bg-surface-2 px-3 py-1.5 text-xs font-medium text-ink transition hover:border-brand/40"
-                >
-                  {preset.name}
-                </button>
-              ))}
+          {!isEdit ? (
+            <div>
+              <p className="mb-2 text-xs font-medium text-ink-muted">Rápido</p>
+              <div className="flex flex-wrap gap-2">
+                {INVESTMENT_PRESETS.map((preset) => (
+                  <button
+                    key={preset.symbol}
+                    type="button"
+                    onClick={() => applyPreset(preset)}
+                    className="rounded-full border border-line bg-surface-2 px-3 py-1.5 text-xs font-medium text-ink transition hover:border-brand/40"
+                  >
+                    {preset.name}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          ) : null}
 
           <div className="space-y-2">
             <Label>Nombre</Label>
             <Input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
+              value={form.name}
+              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
               placeholder="Bitcoin"
             />
           </div>
@@ -519,10 +612,10 @@ export function InvestmentsClient({
                 <button
                   key={k.value}
                   type="button"
-                  onClick={() => setKind(k.value)}
+                  onClick={() => setForm((f) => ({ ...f, kind: k.value }))}
                   className={cn(
                     "rounded-xl border px-3 py-2 text-xs font-medium transition",
-                    kind === k.value
+                    form.kind === k.value
                       ? "border-brand bg-brand/10 text-brand"
                       : "border-line text-ink-muted"
                   )}
@@ -534,17 +627,17 @@ export function InvestmentsClient({
           </div>
 
           <div className="space-y-2">
-            <Label>Símbolo / id (para precio)</Label>
+            <Label>Símbolo (opcional, para precio automático)</Label>
             <Input
-              value={symbol}
-              onChange={(e) => setSymbol(e.target.value)}
-              placeholder={
-                kind === "crypto" ? "bitcoin" : "VWCE.DE"
+              value={form.symbol}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, symbol: e.target.value }))
               }
+              placeholder={form.kind === "crypto" ? "bitcoin" : "VWCE.DE"}
             />
             <p className="text-[11px] text-ink-muted leading-relaxed">
-              Crypto: id CoinGecko (bitcoin, ripple). ETF/acción: ticker Yahoo
-              (VWCE.DE, IWDA.AS).
+              BTC/XRP: bitcoin, ripple. Fondos sin ticker: déjalo vacío y pon
+              el valor actual abajo.
             </p>
           </div>
 
@@ -553,8 +646,10 @@ export function InvestmentsClient({
               <Label>Cantidad</Label>
               <Input
                 inputMode="decimal"
-                value={quantity}
-                onChange={(e) => setQuantity(e.target.value)}
+                value={form.quantity}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, quantity: e.target.value }))
+                }
                 placeholder="0.01"
               />
             </div>
@@ -562,24 +657,35 @@ export function InvestmentsClient({
               <Label>Lo metido (€)</Label>
               <Input
                 inputMode="decimal"
-                value={costBasis}
-                onChange={(e) => setCostBasis(e.target.value)}
+                value={form.costBasis}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, costBasis: e.target.value }))
+                }
                 placeholder="1000"
               />
             </div>
           </div>
 
           <div className="space-y-2">
-            <Label>Valor ahora a mano (€) — opcional</Label>
+            <Label>
+              Valor actual (€){isEdit ? "" : " — opcional"}
+            </Label>
             <Input
               inputMode="decimal"
-              value={manualValue}
-              onChange={(e) => setManualValue(e.target.value)}
-              placeholder="Vacío = usar precio de mercado"
+              value={form.currentValue}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, currentValue: e.target.value }))
+              }
+              placeholder={
+                isEdit
+                  ? "Lo que ves en Trade Republic"
+                  : "Vacío = precio API o lo metido"
+              }
             />
             <p className="text-[11px] text-ink-muted leading-relaxed">
-              Ejemplo: metiste 1000 € y en el banco ves 500 → pon cantidad +
-              símbolo, o deja el valor a mano en 500.
+              {isEdit
+                ? "Úsalo sobre todo en fondos sin símbolo (ej. Fidelity MSCI)."
+                : "En crypto con símbolo suele bastar dejarlo vacío."}
             </p>
           </div>
 
@@ -587,9 +693,9 @@ export function InvestmentsClient({
             type="button"
             className="w-full"
             disabled={loading}
-            onClick={() => void addPosition()}
+            onClick={() => void savePosition()}
           >
-            {loading ? "Guardando…" : "Guardar inversión"}
+            {loading ? "Guardando…" : isEdit ? "Guardar cambios" : "Guardar inversión"}
           </Button>
         </div>
       </AppSheet>
