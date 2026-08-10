@@ -1,6 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { FixedExpense, Profile, Transaction } from "@/lib/types";
 import { autoFixedDescription } from "@/lib/constants";
+import {
+  isFixedFullyPaidManually,
+  manualFixedPaymentsForMonth,
+} from "@/lib/fixed-expense-utils";
 import { currentMonthRange } from "@/lib/utils";
 
 function hasAutoFixedForMonth(
@@ -18,46 +22,10 @@ function hasAutoFixedForMonth(
   );
 }
 
-/** Evita duplicar un fijo ya registrado a mano en el mismo mes. */
-function hasManualFixedDuplicate(
-  txs: Transaction[],
-  fixed: FixedExpense,
-  start: string,
-  end: string
-) {
-  const name = fixed.name.toLowerCase();
-  const amount = Number(fixed.amount);
-
-  return txs.some((t) => {
-    if (t.type !== "expense" || t.fixed_expense_id) return false;
-    if (t.date < start || t.date > end) return false;
-
-    const desc = t.description.toLowerCase();
-    if (desc.includes(name) || name.includes(desc.slice(0, 4))) return true;
-
-    // Alquiler / renta parcial registrada a mano
-    if (
-      (name.includes("alquiler") || name.includes("renta")) &&
-      (desc.includes("alqu") || desc.includes("renta") || desc.includes("alquier"))
-    ) {
-      return true;
-    }
-
-    // Mismo importe y categoría (ej. Netflix 9 € vs 8,99 € manual)
-    if (
-      t.category === fixed.category &&
-      Math.abs(Number(t.amount) - amount) <= 1
-    ) {
-      return true;
-    }
-
-    return false;
-  });
-}
-
 /**
  * Crea el movimiento del mes en curso por cada fijo activo (día 1).
- * Sin backfill histórico: evita desajustar patrimonios ya consolidados.
+ * Si hay un pago manual parcial (ej. alquiler 87,50 € de 325 €), no duplica:
+ * el resto se refleja en patrimonio vía devengo en stats.
  */
 export async function ensureFixedExpenseTransactions(
   supabase: SupabaseClient,
@@ -83,8 +51,7 @@ export async function ensureFixedExpenseTransactions(
   let anyCreated = false;
 
   for (const fixed of active) {
-    if (hasManualFixedDuplicate(txs, fixed, start, end)) {
-      // Si ya había auto-fijo pero el usuario lo registró a mano, quitar el auto
+    if (isFixedFullyPaidManually(txs, fixed, start, end)) {
       const dupAuto: Transaction[] = txs.filter(
         (t) =>
           t.type === "expense" &&
@@ -98,6 +65,11 @@ export async function ensureFixedExpenseTransactions(
       if (dupAuto.length) {
         txs = txs.filter((t) => !dupAuto.some((d) => d.id === t.id));
       }
+      continue;
+    }
+
+    const manualPaid = manualFixedPaymentsForMonth(txs, fixed, start, end);
+    if (manualPaid > 0 && manualPaid < Number(fixed.amount) * 0.9) {
       continue;
     }
 

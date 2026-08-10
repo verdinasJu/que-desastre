@@ -1,22 +1,44 @@
-import type { MonthStats, Profile, Transaction } from "./types";
+import type { FixedExpense, MonthStats, Profile, Transaction } from "./types";
 import { AUTO_SALARY_DESCRIPTION } from "./constants";
+import {
+  isManualFixedDuplicateTx,
+  sumActiveFixedExpenses,
+  unpaidFixedForMonth,
+} from "./fixed-expense-utils";
 
 /**
- * Patrimonio total = ahorro inicial + inversiones iniciales + ingresos - gastos
+ * Patrimonio total = ahorro inicial + inversiones iniciales + ingresos − gastos
+ * − fijos del mes aún no registrados (devengo parcial, ej. alquiler pendiente).
  * Las inversiones NO restan del patrimonio (solo mueven caja → invertido).
  */
 export function calcPatrimonio(
   profile: Profile,
-  transactions: Transaction[]
+  transactions: Transaction[],
+  fixedExpenses: FixedExpense[] = [],
+  monthStart?: string,
+  monthEnd?: string
 ): number {
   const income = sumByType(transactions, "income");
   const expense = sumByType(transactions, "expense");
-  return (
+  let total =
     profile.initial_savings +
     profile.initial_investments +
     income -
-    expense
-  );
+    expense;
+
+  if (fixedExpenses.length && monthStart && monthEnd) {
+    const monthTx = transactions.filter(
+      (t) => t.date >= monthStart && t.date <= monthEnd
+    );
+    total -= unpaidFixedForMonth(
+      fixedExpenses,
+      monthTx,
+      monthStart,
+      monthEnd
+    );
+  }
+
+  return total;
 }
 
 /**
@@ -30,19 +52,30 @@ export function calcMonthStats(
   profile: Profile,
   allTransactions: Transaction[],
   monthStart: string,
-  monthEnd: string
+  monthEnd: string,
+  fixedExpenses: FixedExpense[] = []
 ): MonthStats {
   const monthTx = allTransactions.filter(
     (t) => t.date >= monthStart && t.date <= monthEnd
   );
 
-  const gastosFijosDelMes = monthTx
-    .filter((t) => t.type === "expense" && t.fixed_expense_id)
-    .reduce((acc, t) => acc + Number(t.amount), 0);
+  const gastosFijosDelMes = sumActiveFixedExpenses(fixedExpenses);
 
   const gastosVariablesDelMes = monthTx
-    .filter((t) => t.type === "expense" && !t.fixed_expense_id)
+    .filter(
+      (t) =>
+        t.type === "expense" &&
+        !t.fixed_expense_id &&
+        !isManualFixedDuplicateTx(
+          monthTx,
+          t,
+          fixedExpenses,
+          monthStart,
+          monthEnd
+        )
+    )
     .reduce((acc, t) => acc + Number(t.amount), 0);
+
   const invertidoEsteMes = sumByType(monthTx, "investment");
 
   const autoIncome = monthTx
@@ -80,7 +113,13 @@ export function calcMonthStats(
     gastosVariablesDelMes;
 
   return {
-    patrimonioTotal: calcPatrimonio(profile, allTransactions),
+    patrimonioTotal: calcPatrimonio(
+      profile,
+      allTransactions,
+      fixedExpenses,
+      monthStart,
+      monthEnd
+    ),
     disponibleParaGastar,
     gastadoEsteMes,
     invertidoEsteMes,

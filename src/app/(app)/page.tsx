@@ -13,11 +13,12 @@ import { createClient } from "@/lib/supabase/server";
 import { detectSpendingAnomalies } from "@/lib/anomalies";
 import {
   calcMonthStats,
-  expensesByCategory,
   monthlyEvolution,
 } from "@/lib/stats";
+import { expensesByCategoryForMonth } from "@/lib/fixed-expense-utils";
 import { currentMonthRange, formatCurrency } from "@/lib/utils";
 import type {
+  FixedExpense,
   Profile,
   SavingsGoal,
   Transaction,
@@ -29,7 +30,7 @@ export default async function DashboardPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const [{ data: profile }, { data: transactions }, { data: goals }] =
+  const [{ data: profile }, { data: transactions }, { data: goals }, { data: fixed }] =
     await Promise.all([
       supabase.from("profiles").select("*").eq("id", user!.id).single(),
       supabase
@@ -42,17 +43,28 @@ export default async function DashboardPage() {
         .select("*")
         .eq("user_id", user!.id)
         .order("created_at", { ascending: false }),
+      supabase
+        .from("fixed_expenses")
+        .select("*")
+        .eq("user_id", user!.id)
+        .eq("active", true),
     ]);
 
   const p = { ...(profile as Profile), payday_day: (profile as Profile)?.payday_day ?? 1 };
   const txList = (transactions || []) as Transaction[];
+  const fixedList = (fixed || []) as FixedExpense[];
 
   const { start, end } = currentMonthRange();
-  const stats = calcMonthStats(p, txList, start, end);
+  const stats = calcMonthStats(p, txList, start, end, fixedList);
   const monthExpenses = txList.filter(
     (t) => t.type === "expense" && t.date >= start && t.date <= end
   );
-  const byCategory = expensesByCategory(monthExpenses);
+  const byCategory = expensesByCategoryForMonth(
+    monthExpenses,
+    fixedList,
+    start,
+    end
+  );
   const evolution = monthlyEvolution(p, txList, 6);
   const monthLabel = new Date().toLocaleDateString("es-ES", {
     month: "long",
@@ -87,7 +99,7 @@ export default async function DashboardPage() {
           large
           title="Patrimonio total"
           value={stats.patrimonioTotal}
-          hint="Ahorro + inversiones + ingresos − gastos (fijos incluidos como movimientos)"
+          hint="Ahorro + inversiones + ingresos − gastos − fijos pendientes del mes"
           icon={Landmark}
           tone="accent"
           className="sm:col-span-2"
@@ -135,6 +147,10 @@ export default async function DashboardPage() {
       <DashboardCharts
         evolution={evolution}
         byCategory={byCategory}
+        monthExpenses={monthExpenses}
+        fixedExpenses={fixedList}
+        monthStart={start}
+        monthEnd={end}
         currency={p.currency}
       />
     </div>
