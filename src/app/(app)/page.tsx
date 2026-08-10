@@ -19,6 +19,7 @@ import { expensesByCategoryForMonth } from "@/lib/fixed-expense-utils";
 import { currentMonthRange, formatCurrency } from "@/lib/utils";
 import type {
   FixedExpense,
+  InvestmentPosition,
   Profile,
   SavingsGoal,
   Transaction,
@@ -30,32 +31,42 @@ export default async function DashboardPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const [{ data: profile }, { data: transactions }, { data: goals }, { data: fixed }] =
-    await Promise.all([
-      supabase.from("profiles").select("*").eq("id", user!.id).single(),
-      supabase
-        .from("transactions")
-        .select("*")
-        .eq("user_id", user!.id)
-        .order("date", { ascending: false }),
-      supabase
-        .from("savings_goals")
-        .select("*")
-        .eq("user_id", user!.id)
-        .order("created_at", { ascending: false }),
-      supabase
-        .from("fixed_expenses")
-        .select("*")
-        .eq("user_id", user!.id)
-        .eq("active", true),
-    ]);
+  const [
+    { data: profile },
+    { data: transactions },
+    { data: goals },
+    { data: fixed },
+    { data: positions },
+  ] = await Promise.all([
+    supabase.from("profiles").select("*").eq("id", user!.id).single(),
+    supabase
+      .from("transactions")
+      .select("*")
+      .eq("user_id", user!.id)
+      .order("date", { ascending: false }),
+    supabase
+      .from("savings_goals")
+      .select("*")
+      .eq("user_id", user!.id)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("fixed_expenses")
+      .select("*")
+      .eq("user_id", user!.id)
+      .eq("active", true),
+    supabase
+      .from("investment_positions")
+      .select("*")
+      .eq("user_id", user!.id),
+  ]);
 
   const p = { ...(profile as Profile), payday_day: (profile as Profile)?.payday_day ?? 1 };
   const txList = (transactions || []) as Transaction[];
   const fixedList = (fixed || []) as FixedExpense[];
+  const positionList = (positions || []) as InvestmentPosition[];
 
   const { start, end } = currentMonthRange();
-  const stats = calcMonthStats(p, txList, start, end, fixedList);
+  const stats = calcMonthStats(p, txList, start, end, fixedList, positionList);
   const monthExpenses = txList.filter(
     (t) => t.type === "expense" && t.date >= start && t.date <= end
   );
@@ -99,7 +110,7 @@ export default async function DashboardPage() {
           large
           title="Patrimonio total"
           value={stats.patrimonioTotal}
-          hint="Ahorro + inversiones + ingresos − gastos − fijos pendientes del mes"
+          hint="Ahorro + valor de cartera (o inversión inicial) + ingresos − gastos − fijos pendientes"
           icon={Landmark}
           tone="accent"
           className="sm:col-span-2"

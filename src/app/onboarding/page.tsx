@@ -164,8 +164,10 @@ export default function OnboardingPage() {
               Tu patrimonio actual
             </h1>
             <p className="text-sm text-ink-muted">
-              El ahorro e inversión inicial forman tu patrimonio. Las futuras
-              inversiones no se “pierden”: se mueven de caja a invertido.
+              El ahorro forma tu patrimonio base. Las inversiones detalladas
+              (BTC, fondos…) las puedes añadir después en Más → Inversiones,
+              con lo metido y el valor actual. Aquí puedes poner un total
+              aproximado si quieres.
             </p>
             <div className="space-y-2">
               <Label htmlFor="savings">Ahorro actual (€)</Label>
@@ -178,7 +180,9 @@ export default function OnboardingPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="investments">Inversiones actuales (€)</Label>
+              <Label htmlFor="investments">
+                Inversiones aproximadas (€) — opcional
+              </Label>
               <Input
                 id="investments"
                 inputMode="decimal"
@@ -186,6 +190,10 @@ export default function OnboardingPage() {
                 value={investments}
                 onChange={(e) => setInvestments(e.target.value)}
               />
+              <p className="text-xs text-ink-muted leading-relaxed">
+                Si luego creas posiciones en Inversiones, el patrimonio usará
+                el valor de mercado de esas posiciones (puede subir o bajar).
+              </p>
             </div>
           </>
         )}

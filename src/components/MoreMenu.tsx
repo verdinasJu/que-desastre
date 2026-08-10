@@ -3,11 +3,19 @@
 import { useCallback, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Calculator, Plane, LayoutGrid, HandCoins } from "lucide-react";
+import { Calculator, Plane, LayoutGrid, HandCoins, LineChart } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AppSheet } from "@/components/AppSheet";
 
 const tools = [
+  {
+    href: "/inversiones",
+    label: "Inversiones",
+    description: "Cartera y valor actual",
+    icon: LineChart,
+    tile: "from-emerald-50 to-teal-50 text-emerald-900",
+    iconWrap: "bg-white/80 text-emerald-700 shadow-sm",
+  },
   {
     href: "/viajes",
     label: "Modo viaje",
@@ -41,7 +49,8 @@ export function MoreMenuButton() {
   const active =
     pathname.startsWith("/viajes") ||
     pathname.startsWith("/calculadora") ||
-    pathname.startsWith("/deudas");
+    pathname.startsWith("/deudas") ||
+    pathname.startsWith("/inversiones");
 
   return (
     <>
@@ -72,7 +81,7 @@ export function MoreMenuButton() {
         open={open}
         onClose={close}
         title="Más opciones"
-        subtitle="Viaje, deudas, calculadora…"
+        subtitle="Inversiones, viaje, deudas…"
         labelledBy="more-menu-title"
       >
         <div className="grid grid-cols-2 gap-3 pb-1">

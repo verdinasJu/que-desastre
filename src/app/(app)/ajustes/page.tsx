@@ -214,13 +214,19 @@ export default function AjustesPage() {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="investments">Inversión inicial (€)</Label>
+            <Label htmlFor="investments">
+              Inversión inicial / aproximada (€)
+            </Label>
             <Input
               id="investments"
               inputMode="decimal"
               value={investments}
               onChange={(e) => setInvestments(e.target.value)}
             />
+            <p className="text-xs text-ink-muted leading-relaxed">
+              Se usa solo si aún no tienes posiciones en Más → Inversiones.
+              Con cartera creada, manda el valor de mercado de BTC, XRP, fondos…
+            </p>
           </div>
           <Button onClick={saveProfile} disabled={saving} className="w-full">
             {saving ? "Guardando…" : "Guardar cambios"}

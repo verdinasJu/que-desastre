@@ -1,30 +1,55 @@
-import type { FixedExpense, MonthStats, Profile, Transaction } from "./types";
+import type {
+  FixedExpense,
+  InvestmentPosition,
+  MonthStats,
+  Profile,
+  Transaction,
+} from "./types";
 import { AUTO_SALARY_DESCRIPTION } from "./constants";
 import {
   isManualFixedDuplicateTx,
   sumActiveFixedExpenses,
   unpaidFixedForMonth,
 } from "./fixed-expense-utils";
+import { positionCurrentValue } from "./investment-prices";
+
+/** Valor de mercado de la cartera; si no hay posiciones, el valor de onboarding. */
+export function calcInvestmentsMarketValue(
+  profile: Profile,
+  positions: InvestmentPosition[] = []
+): number {
+  if (!positions.length) return Number(profile.initial_investments) || 0;
+  return positions.reduce(
+    (acc, p) =>
+      acc +
+      positionCurrentValue({
+        quantity: Number(p.quantity),
+        last_price: p.last_price,
+        last_value: p.last_value,
+        manual_value: p.manual_value,
+      }),
+    0
+  );
+}
 
 /**
- * Patrimonio total = ahorro inicial + inversiones iniciales + ingresos − gastos
+ * Patrimonio total = ahorro inicial + valor inversiones + ingresos − gastos
  * − fijos del mes aún no registrados (devengo parcial, ej. alquiler pendiente).
- * Las inversiones NO restan del patrimonio (solo mueven caja → invertido).
+ * Si hay cartera en Inversiones, usa su valor de mercado (puede subir o bajar).
  */
 export function calcPatrimonio(
   profile: Profile,
   transactions: Transaction[],
   fixedExpenses: FixedExpense[] = [],
   monthStart?: string,
-  monthEnd?: string
+  monthEnd?: string,
+  positions: InvestmentPosition[] = []
 ): number {
   const income = sumByType(transactions, "income");
   const expense = sumByType(transactions, "expense");
+  const investments = calcInvestmentsMarketValue(profile, positions);
   let total =
-    profile.initial_savings +
-    profile.initial_investments +
-    income -
-    expense;
+    profile.initial_savings + investments + income - expense;
 
   if (fixedExpenses.length && monthStart && monthEnd) {
     const monthTx = transactions.filter(
@@ -53,7 +78,8 @@ export function calcMonthStats(
   allTransactions: Transaction[],
   monthStart: string,
   monthEnd: string,
-  fixedExpenses: FixedExpense[] = []
+  fixedExpenses: FixedExpense[] = [],
+  positions: InvestmentPosition[] = []
 ): MonthStats {
   const monthTx = allTransactions.filter(
     (t) => t.date >= monthStart && t.date <= monthEnd
@@ -118,7 +144,8 @@ export function calcMonthStats(
       allTransactions,
       fixedExpenses,
       monthStart,
-      monthEnd
+      monthEnd,
+      positions
     ),
     disponibleParaGastar,
     gastadoEsteMes,

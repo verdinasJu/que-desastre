@@ -104,6 +104,27 @@ export interface Debt {
   created_at?: string;
 }
 
+export type AssetKind = "crypto" | "etf" | "stock" | "other";
+
+export interface InvestmentPosition {
+  id: string;
+  user_id: string;
+  name: string;
+  asset_kind: AssetKind;
+  symbol: string | null;
+  quantity: number;
+  /** Lo que metiste en € (coste de adquisición). */
+  cost_basis: number;
+  /** Si lo rellenas, se usa en lugar del precio de mercado. */
+  manual_value: number | null;
+  last_price: number | null;
+  last_value: number | null;
+  priced_at: string | null;
+  notes: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface MonthStats {
   patrimonioTotal: number;
   disponibleParaGastar: number;
