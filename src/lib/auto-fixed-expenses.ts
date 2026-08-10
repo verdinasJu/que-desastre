@@ -1,41 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { FixedExpense, Profile, Transaction } from "@/lib/types";
 import { autoFixedDescription } from "@/lib/constants";
+import { currentMonthRange } from "@/lib/utils";
 
-function monthStart(year: number, monthIndex: number): string {
-  return new Date(year, monthIndex, 1).toISOString().slice(0, 10);
-}
-
-function monthEnd(year: number, monthIndex: number): string {
-  return new Date(year, monthIndex + 1, 0).toISOString().slice(0, 10);
-}
-
-function monthRangeFromIso(iso: string) {
-  const d = new Date(`${iso.slice(0, 10)}T12:00:00`);
-  return { year: d.getFullYear(), month: d.getMonth() };
-}
-
-/** Meses inclusivos desde startIso hasta el mes actual. */
-function eachMonthUntilNow(startIso: string) {
-  const start = monthRangeFromIso(startIso);
-  const now = new Date();
-  const endYear = now.getFullYear();
-  const endMonth = now.getMonth();
-  const months: { year: number; month: number }[] = [];
-  let y = start.year;
-  let m = start.month;
-  while (y < endYear || (y === endYear && m <= endMonth)) {
-    months.push({ year: y, month: m });
-    m += 1;
-    if (m > 11) {
-      m = 0;
-      y += 1;
-    }
-  }
-  return months;
-}
-
-function hasFixedTxForMonth(
+function hasAutoFixedForMonth(
   txs: Transaction[],
   fixedId: string,
   start: string,
@@ -50,27 +18,58 @@ function hasFixedTxForMonth(
   );
 }
 
+/** Evita duplicar un fijo ya registrado a mano en el mismo mes. */
+function hasManualFixedDuplicate(
+  txs: Transaction[],
+  fixed: FixedExpense,
+  start: string,
+  end: string
+) {
+  const name = fixed.name.toLowerCase();
+  const amount = Number(fixed.amount);
+
+  return txs.some((t) => {
+    if (t.type !== "expense" || t.fixed_expense_id) return false;
+    if (t.date < start || t.date > end) return false;
+
+    const desc = t.description.toLowerCase();
+    if (desc.includes(name) || name.includes(desc.slice(0, 4))) return true;
+
+    // Alquiler / renta parcial registrada a mano
+    if (
+      (name.includes("alquiler") || name.includes("renta")) &&
+      (desc.includes("alqu") || desc.includes("renta") || desc.includes("alquier"))
+    ) {
+      return true;
+    }
+
+    // Mismo importe y categoría (ej. Netflix 9 € vs 8,99 € manual)
+    if (
+      t.category === fixed.category &&
+      Math.abs(Number(t.amount) - amount) <= 1
+    ) {
+      return true;
+    }
+
+    return false;
+  });
+}
+
 /**
- * Crea movimientos de gasto por cada fijo activo, mes a mes, desde el alta
- * (onboarding o creación del fijo) hasta hoy. Así el patrimonio refleja los fijos.
+ * Crea el movimiento del mes en curso por cada fijo activo (día 1).
+ * Sin backfill histórico: evita desajustar patrimonios ya consolidados.
  */
 export async function ensureFixedExpenseTransactions(
   supabase: SupabaseClient,
   userId: string,
-  profile: Profile,
+  _profile: Profile,
   fixedExpenses: FixedExpense[],
   existingTransactions?: Transaction[]
 ): Promise<boolean> {
   const active = fixedExpenses.filter((f) => f.active);
   if (!active.length) return false;
 
-  const onboardedAt =
-    profile.onboarding_completed_at ||
-    profile.updated_at ||
-    profile.created_at;
-  if (!onboardedAt) return false;
-
-  const today = new Date().toISOString().slice(0, 10);
+  const { start, end } = currentMonthRange();
 
   let txs = existingTransactions;
   if (!txs) {
@@ -84,36 +83,43 @@ export async function ensureFixedExpenseTransactions(
   let anyCreated = false;
 
   for (const fixed of active) {
-    const fixedCreated = fixed.created_at || onboardedAt;
-    const rangeStart =
-      fixedCreated.slice(0, 10) > onboardedAt.slice(0, 10)
-        ? fixedCreated
-        : onboardedAt;
-
-    for (const { year, month } of eachMonthUntilNow(rangeStart)) {
-      const start = monthStart(year, month);
-      const end = monthEnd(year, month);
-      if (start > today) continue;
-      if (hasFixedTxForMonth(txs, fixed.id, start, end)) continue;
-
-      const { data, error } = await supabase
-        .from("transactions")
-        .insert({
-          user_id: userId,
-          type: "expense",
-          amount: Number(fixed.amount),
-          description: autoFixedDescription(fixed.name),
-          category: fixed.category || "Fijos",
-          date: start,
-          fixed_expense_id: fixed.id,
-        })
-        .select()
-        .single();
-
-      if (!error && data) {
-        anyCreated = true;
-        txs = [...txs, data as Transaction];
+    if (hasManualFixedDuplicate(txs, fixed, start, end)) {
+      // Si ya había auto-fijo pero el usuario lo registró a mano, quitar el auto
+      const dupAuto = txs.filter(
+        (t) =>
+          t.type === "expense" &&
+          t.fixed_expense_id === fixed.id &&
+          t.date >= start &&
+          t.date <= end
+      );
+      for (const row of dupAuto) {
+        await supabase.from("transactions").delete().eq("id", row.id);
       }
+      if (dupAuto.length) {
+        txs = txs.filter((t) => !dupAuto.some((d) => d.id === t.id));
+      }
+      continue;
+    }
+
+    if (hasAutoFixedForMonth(txs, fixed.id, start, end)) continue;
+
+    const { data, error } = await supabase
+      .from("transactions")
+      .insert({
+        user_id: userId,
+        type: "expense",
+        amount: Number(fixed.amount),
+        description: autoFixedDescription(fixed.name),
+        category: fixed.category || "Fijos",
+        date: start,
+        fixed_expense_id: fixed.id,
+      })
+      .select()
+      .single();
+
+    if (!error && data) {
+      anyCreated = true;
+      txs = [...txs, data as Transaction];
     }
   }
 
