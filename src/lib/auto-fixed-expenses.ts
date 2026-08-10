@@ -85,7 +85,7 @@ export async function ensureFixedExpenseTransactions(
   for (const fixed of active) {
     if (hasManualFixedDuplicate(txs, fixed, start, end)) {
       // Si ya había auto-fijo pero el usuario lo registró a mano, quitar el auto
-      const dupAuto = txs.filter(
+      const dupAuto: Transaction[] = txs.filter(
         (t) =>
           t.type === "expense" &&
           t.fixed_expense_id === fixed.id &&
