@@ -89,6 +89,21 @@ export interface SavingsGoal {
   created_at?: string;
 }
 
+export type DebtDirection = "i_owe" | "they_owe";
+
+export interface Debt {
+  id: string;
+  user_id: string;
+  direction: DebtDirection;
+  person_name: string;
+  description: string;
+  amount: number;
+  paid_amount: number;
+  due_date: string | null;
+  settled: boolean;
+  created_at?: string;
+}
+
 export interface MonthStats {
   patrimonioTotal: number;
   disponibleParaGastar: number;

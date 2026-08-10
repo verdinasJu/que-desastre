@@ -3,7 +3,7 @@
 import { useCallback, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Calculator, Plane, LayoutGrid } from "lucide-react";
+import { Calculator, Plane, LayoutGrid, HandCoins } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AppSheet } from "@/components/AppSheet";
 
@@ -15,6 +15,14 @@ const tools = [
     icon: Plane,
     tile: "from-sky-50 to-indigo-50 text-sky-800",
     iconWrap: "bg-white/80 text-sky-700 shadow-sm",
+  },
+  {
+    href: "/deudas",
+    label: "Deudas",
+    description: "Te deben / debes tú",
+    icon: HandCoins,
+    tile: "from-amber-50 to-orange-50 text-amber-900",
+    iconWrap: "bg-white/80 text-amber-700 shadow-sm",
   },
   {
     href: "/calculadora",
@@ -31,7 +39,9 @@ export function MoreMenuButton() {
   const close = useCallback(() => setOpen(false), []);
   const pathname = usePathname();
   const active =
-    pathname.startsWith("/viajes") || pathname.startsWith("/calculadora");
+    pathname.startsWith("/viajes") ||
+    pathname.startsWith("/calculadora") ||
+    pathname.startsWith("/deudas");
 
   return (
     <>
@@ -62,7 +72,7 @@ export function MoreMenuButton() {
         open={open}
         onClose={close}
         title="Más opciones"
-        subtitle="Calculadora, viaje y más herramientas"
+        subtitle="Viaje, deudas, calculadora…"
         labelledBy="more-menu-title"
       >
         <div className="grid grid-cols-2 gap-3 pb-1">
