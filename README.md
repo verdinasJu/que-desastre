@@ -61,7 +61,7 @@ En cada visita (`AutoFinanceSync`):
 | **Disponible para gastar** | ingreso base del mes + extras − fijos configurados − inversiones del mes − gastos variables |
 | **Gastado este mes** | fijos activos (config) + variables del mes (sin duplicar pagos parciales de fijos) |
 | **Invertido este mes** | Σ movimientos tipo `investment` del mes (caja → invertido; **no** restan del patrimonio) |
-| **Ahorro del mes** | ingreso base − fijos − invertido − variables |
+| **Ahorro del mes** | ingreso base + extras − fijos − invertido − variables |
 
 ### Notas importantes
 

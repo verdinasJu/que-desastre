@@ -135,8 +135,11 @@ export function calcMonthStats(
     invertidoEsteMes -
     gastosVariablesDelMes;
 
+  // Mismos ingresos extras que el disponible: un bizum/extra de 50 € también
+  // aumenta el ahorro del mes (antes solo contaba la nómina base).
   const ahorroDelMes =
-    ingresoBaseDelMes -
+    ingresoBaseDelMes +
+    otherIncome -
     gastosFijosDelMes -
     invertidoEsteMes -
     gastosVariablesDelMes;

@@ -143,7 +143,7 @@ export default async function DashboardPage() {
         <StatCard
           title="Ahorro del mes"
           value={stats.ahorroDelMes}
-          hint="Lo que queda de tu ingreso mensual tras gastos e inversiones"
+          hint="Nómina + extras − fijos − inversiones − gastos del mes"
           icon={PiggyBank}
           tone={stats.ahorroDelMes >= 0 ? "positive" : "warning"}
           currency={p.currency}
