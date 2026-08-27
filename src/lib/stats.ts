@@ -144,13 +144,23 @@ export function calcMonthStats(
     invertidoEsteMes -
     gastosVariablesDelMes;
 
+  const { start: currentStart } = (() => {
+    const now = new Date();
+    return {
+      start: new Date(now.getFullYear(), now.getMonth(), 1)
+        .toISOString()
+        .slice(0, 10),
+    };
+  })();
+  const isViewingCurrentMonth = monthStart === currentStart;
+
   return {
     patrimonioTotal: calcPatrimonio(
       profile,
       allTransactions,
-      fixedExpenses,
-      monthStart,
-      monthEnd,
+      isViewingCurrentMonth ? fixedExpenses : [],
+      isViewingCurrentMonth ? monthStart : undefined,
+      isViewingCurrentMonth ? monthEnd : undefined,
       positions
     ),
     disponibleParaGastar,
@@ -210,7 +220,9 @@ export function spentByCategoryThisMonth(
 export function monthlyEvolution(
   profile: Profile,
   transactions: Transaction[],
-  months = 6
+  months = 6,
+  /** Mes ancla (último de la serie). Por defecto: hoy. */
+  anchor: Date = new Date()
 ): { month: string; gastado: number; invertido: number; ingresos: number }[] {
   const result: {
     month: string;
@@ -218,10 +230,9 @@ export function monthlyEvolution(
     invertido: number;
     ingresos: number;
   }[] = [];
-  const now = new Date();
 
   for (let i = months - 1; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const d = new Date(anchor.getFullYear(), anchor.getMonth() - i, 1);
     const start = new Date(d.getFullYear(), d.getMonth(), 1)
       .toISOString()
       .slice(0, 10);

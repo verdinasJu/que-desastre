@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { FilterBar } from "@/components/FilterBar";
+import { FilterBar, type MovementTypeFilter } from "@/components/FilterBar";
 import { TransactionList } from "@/components/TransactionList";
 import { TransactionForm } from "@/components/TransactionForm";
 import { CsvImportButton } from "@/components/CsvImportButton";
@@ -22,6 +22,7 @@ export default function MovimientosPage() {
   const [query, setQuery] = useState("");
   const [from, setFrom] = useState(range.start);
   const [to, setTo] = useState(range.end);
+  const [typeFilter, setTypeFilter] = useState<MovementTypeFilter>("all");
   const [items, setItems] = useState<Transaction[]>([]);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -66,14 +67,16 @@ export default function MovimientosPage() {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return items;
-    return items.filter(
-      (t) =>
+    return items.filter((t) => {
+      if (typeFilter !== "all" && t.type !== typeFilter) return false;
+      if (!q) return true;
+      return (
         t.description.toLowerCase().includes(q) ||
         t.category.toLowerCase().includes(q) ||
         t.type.toLowerCase().includes(q)
-    );
-  }, [items, query]);
+      );
+    });
+  }, [items, query, typeFilter]);
 
   async function handleDelete(id: string) {
     const supabase = createClient();
@@ -132,9 +135,11 @@ export default function MovimientosPage() {
         query={query}
         from={from}
         to={to}
+        typeFilter={typeFilter}
         onQueryChange={setQuery}
         onFromChange={setFrom}
         onToChange={setTo}
+        onTypeFilterChange={setTypeFilter}
       />
 
       {loading ? (

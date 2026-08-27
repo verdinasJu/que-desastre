@@ -238,10 +238,10 @@ export function DashboardCharts({
         <Card className="animate-rise overflow-hidden" style={{ animationDelay: "180ms" }}>
           <CardHeader>
             <CardTitle>Gastos por categoría</CardTitle>
-            <CardDescription className="leading-relaxed">
-              Reparto de lo gastado <span className="font-medium">este mes</span>.
-              Toca una categoría para ver el detalle.
-            </CardDescription>
+              <CardDescription className="leading-relaxed">
+                Reparto de lo gastado en el mes seleccionado. Toca una
+                categoría para ver el detalle.
+              </CardDescription>
           </CardHeader>
           <CardContent className="pb-5 pt-2">
             {categoryData.length === 0 ? (
