@@ -14,7 +14,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { createClient } from "@/lib/supabase/client";
-import { currentMonthRange } from "@/lib/utils";
+import { currentMonthRange, formatCurrency, cn } from "@/lib/utils";
 import type { Profile, Transaction } from "@/lib/types";
 
 export default function MovimientosPage() {
@@ -77,6 +77,21 @@ export default function MovimientosPage() {
       );
     });
   }, [items, query, typeFilter]);
+
+  const totals = useMemo(() => {
+    let gastos = 0;
+    let ingresos = 0;
+    let inversiones = 0;
+    for (const t of filtered) {
+      const n = Number(t.amount) || 0;
+      if (t.type === "expense") gastos += n;
+      else if (t.type === "income") ingresos += n;
+      else if (t.type === "investment") inversiones += n;
+    }
+    return { gastos, ingresos, inversiones, count: filtered.length };
+  }, [filtered]);
+
+  const currency = profile?.currency || "EUR";
 
   async function handleDelete(id: string) {
     const supabase = createClient();
@@ -142,11 +157,52 @@ export default function MovimientosPage() {
         onTypeFilterChange={setTypeFilter}
       />
 
+      {!loading ? (
+        <div className="rounded-2xl border border-line/80 bg-surface px-4 py-3 shadow-sm">
+          <p className="mb-2 text-[11px] font-medium text-ink-muted">
+            Suma del filtro · {totals.count} movimiento
+            {totals.count === 1 ? "" : "s"}
+          </p>
+          <div
+            className={cn(
+              "grid gap-2",
+              typeFilter === "all" ? "grid-cols-3" : "grid-cols-1"
+            )}
+          >
+            {(typeFilter === "all" || typeFilter === "expense") && (
+              <div className="rounded-xl bg-rose-50 px-3 py-2">
+                <p className="text-[11px] text-rose-700/80">Gastos</p>
+                <p className="text-sm font-semibold tabular-nums text-rose-700">
+                  −{formatCurrency(totals.gastos, currency)}
+                </p>
+              </div>
+            )}
+            {(typeFilter === "all" || typeFilter === "income") && (
+              <div className="rounded-xl bg-emerald-50 px-3 py-2">
+                <p className="text-[11px] text-emerald-700/80">Ingresos</p>
+                <p className="text-sm font-semibold tabular-nums text-emerald-700">
+                  +{formatCurrency(totals.ingresos, currency)}
+                </p>
+              </div>
+            )}
+            {(typeFilter === "all" || typeFilter === "investment") && (
+              <div className="rounded-xl bg-sky-50 px-3 py-2">
+                <p className="text-[11px] text-sky-700/80">Inversiones</p>
+                <p className="text-sm font-semibold tabular-nums text-sky-700">
+                  →{formatCurrency(totals.inversiones, currency)}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      ) : null}
+
       {loading ? (
         <p className="text-sm text-ink-muted">Cargando…</p>
       ) : (
         <TransactionList
           items={filtered}
+          currency={currency}
           monthlySalary={Number(profile?.monthly_salary || 0)}
           hoursPerMonth={Number(profile?.hours_per_month || 160)}
           onDelete={handleDelete}
