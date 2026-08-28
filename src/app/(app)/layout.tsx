@@ -1,12 +1,14 @@
 import { BottomNav } from "@/components/BottomNav";
 import { QuickAddButton } from "@/components/QuickAddButton";
 import { AutoFinanceSync } from "@/components/AutoFinanceSync";
+import { requireOnboardingComplete } from "@/lib/onboarding-guard";
 
 export default async function AppShellLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  await requireOnboardingComplete();
   await AutoFinanceSync();
 
   return (

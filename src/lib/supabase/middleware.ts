@@ -54,33 +54,8 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  if (user && !isAuthRoute && path !== "/onboarding") {
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("onboarding_completed")
-      .eq("id", user.id)
-      .maybeSingle();
-
-    if (!profile || !profile.onboarding_completed) {
-      const url = request.nextUrl.clone();
-      url.pathname = "/onboarding";
-      return NextResponse.redirect(url);
-    }
-  }
-
-  if (user && path === "/onboarding") {
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("onboarding_completed")
-      .eq("id", user.id)
-      .maybeSingle();
-
-    if (profile?.onboarding_completed) {
-      const url = request.nextUrl.clone();
-      url.pathname = "/";
-      return NextResponse.redirect(url);
-    }
-  }
+  // Onboarding: comprobado en layouts (Node), no aquí. Menos llamadas a Supabase
+  // en el edge middleware → menos 504 MIDDLEWARE_INVOCATION_TIMEOUT.
 
   return supabaseResponse;
 }

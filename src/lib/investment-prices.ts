@@ -14,6 +14,22 @@ const ISIN_TO_YAHOO: Record<string, string> = {
   IE00BYX5NX33: "0P0001CLDK.F", // Fidelity MSCI World P EUR Acc (sin hedge)
 };
 
+const FETCH_TIMEOUT_MS = 8_000;
+
+async function fetchWithTimeout(
+  url: string,
+  init?: RequestInit,
+  ms = FETCH_TIMEOUT_MS
+): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ms);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /** Presets frecuentes (Trade Republic / Europa). */
 export const INVESTMENT_PRESETS: InvestmentPreset[] = [
   {
@@ -52,7 +68,7 @@ export async function fetchCryptoPricesEur(
     unique.join(",")
   )}&vs_currencies=eur`;
 
-  const res = await fetch(url, {
+  const res = await fetchWithTimeout(url, {
     next: { revalidate: 60 },
     headers: { Accept: "application/json" },
   });
@@ -85,7 +101,7 @@ export async function resolveYahooSymbol(input: string): Promise<string> {
     const url = `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(
       raw
     )}&quotesCount=8&newsCount=0`;
-    const res = await fetch(url, {
+    const res = await fetchWithTimeout(url, {
       next: { revalidate: 3600 },
       headers: {
         Accept: "application/json",
@@ -125,7 +141,7 @@ export async function fetchYahooPriceEur(
   )}?interval=1d&range=1d`;
 
   try {
-    const res = await fetch(url, {
+    const res = await fetchWithTimeout(url, {
       next: { revalidate: 60 },
       headers: {
         Accept: "application/json",
@@ -156,7 +172,7 @@ export async function fetchYahooPriceEur(
 
 async function fetchFxToEur(from: string): Promise<number | null> {
   try {
-    const res = await fetch(
+    const res = await fetchWithTimeout(
       `https://api.frankfurter.app/latest?from=${from}&to=EUR`,
       { next: { revalidate: 3600 } }
     );

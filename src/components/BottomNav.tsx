@@ -26,6 +26,7 @@ export function BottomNav() {
             <Link
               key={href}
               href={href}
+              prefetch={false}
               className={cn(
                 "flex min-w-0 flex-1 flex-col items-center gap-1 rounded-xl px-1 py-2 text-[10px] font-medium transition-colors sm:text-[11px]",
                 active ? "text-brand" : "text-ink-muted hover:text-ink"
@@ -47,6 +48,7 @@ export function BottomNav() {
             <Link
               key={href}
               href={href}
+              prefetch={false}
               className={cn(
                 "flex min-w-0 flex-1 flex-col items-center gap-1 rounded-xl px-1 py-2 text-[10px] font-medium transition-colors sm:text-[11px]",
                 active ? "text-brand" : "text-ink-muted hover:text-ink"
