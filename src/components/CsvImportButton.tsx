@@ -2,12 +2,14 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Upload, CheckSquare, Square } from "lucide-react";
+import { Upload, CheckSquare, Square, Pencil, Check } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { AppSheet } from "@/components/AppSheet";
 import { createClient } from "@/lib/supabase/client";
 import { parseBankCsv, type CsvPreviewRow } from "@/lib/csv-import";
+import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from "@/lib/constants";
 import { formatCurrency, formatDate, cn } from "@/lib/utils";
 
 export function CsvImportButton({ onImported }: { onImported?: () => void }) {
@@ -17,6 +19,9 @@ export function CsvImportButton({ onImported }: { onImported?: () => void }) {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [fileName, setFileName] = useState("");
+  const [editingIdx, setEditingIdx] = useState<number | null>(null);
+  const [editDesc, setEditDesc] = useState("");
+  const [editCat, setEditCat] = useState("");
 
   const selectedCount = useMemo(
     () => rows.filter((r) => r.selected).length,
@@ -28,6 +33,31 @@ export function CsvImportButton({ onImported }: { onImported?: () => void }) {
     setRows([]);
     setError("");
     setFileName("");
+    setEditingIdx(null);
+  }
+
+  function startEdit(i: number) {
+    setEditingIdx(i);
+    setEditDesc(rows[i].description);
+    setEditCat(rows[i].category);
+  }
+
+  function saveEdit() {
+    if (editingIdx === null) return;
+    setRows((prev) =>
+      prev.map((r, idx) =>
+        idx === editingIdx
+          ? { ...r, description: editDesc.trim() || r.description, category: editCat }
+          : r
+      )
+    );
+    setEditingIdx(null);
+  }
+
+  function applyToSelected(field: "category" | "description", value: string) {
+    setRows((prev) =>
+      prev.map((r) => (r.selected ? { ...r, [field]: value } : r))
+    );
   }
 
   async function onFile(file: File) {
@@ -175,8 +205,33 @@ export function CsvImportButton({ onImported }: { onImported?: () => void }) {
               </div>
 
               <p className="text-[11px] text-ink-muted">
-                Toca el tipo para cambiar gasto ↔ ingreso.
+                Toca ✏️ para editar descripción/categoría. Toca el tipo para
+                cambiar gasto ↔ ingreso.
               </p>
+
+              {/* Acciones en lote para seleccionados */}
+              {selectedCount > 0 ? (
+                <div className="space-y-2 rounded-xl border border-brand/20 bg-brand/5 px-3 py-2.5">
+                  <p className="text-[11px] font-medium text-brand">
+                    Aplicar a los {selectedCount} seleccionados:
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {(rows.some((r) => r.selected && r.type === "expense")
+                      ? EXPENSE_CATEGORIES
+                      : INCOME_CATEGORIES
+                    ).map((cat) => (
+                      <button
+                        key={cat}
+                        type="button"
+                        onClick={() => applyToSelected("category", cat)}
+                        className="rounded-full bg-surface px-2.5 py-1 text-[11px] font-medium text-ink-muted transition hover:bg-surface-2 hover:text-ink"
+                      >
+                        {cat}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
 
               {/* Lista de movimientos */}
               <ul className="space-y-2">
@@ -190,39 +245,92 @@ export function CsvImportButton({ onImported }: { onImported?: () => void }) {
                         : "border-transparent bg-surface-2/40 opacity-50"
                     )}
                   >
-                    <div className="flex items-start gap-2.5">
-                      <input
-                        type="checkbox"
-                        className="mt-0.5 h-4 w-4 shrink-0 accent-brand"
-                        checked={r.selected}
-                        onChange={() => toggle(i)}
-                      />
-                      <div className="min-w-0 flex-1">
-                        <p className="break-words font-medium leading-snug">
-                          {r.description}
-                        </p>
-                        <p className="mt-0.5 text-[11px] text-ink-muted">
-                          {formatDate(r.date)} · {r.category}
-                        </p>
+                    {editingIdx === i ? (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-medium text-brand">
+                            Editando · {formatDate(r.date)} · {formatCurrency(r.amount)}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={saveEdit}
+                            className="rounded-lg bg-brand p-1.5 text-white"
+                          >
+                            <Check className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                        <Input
+                          value={editDesc}
+                          onChange={(e) => setEditDesc(e.target.value)}
+                          placeholder="Descripción"
+                          className="text-sm"
+                        />
+                        <div className="flex flex-wrap gap-1.5">
+                          {(r.type === "expense"
+                            ? EXPENSE_CATEGORIES
+                            : INCOME_CATEGORIES
+                          ).map((cat) => (
+                            <button
+                              key={cat}
+                              type="button"
+                              onClick={() => setEditCat(cat)}
+                              className={cn(
+                                "rounded-full px-2.5 py-1 text-[11px] font-medium transition",
+                                editCat === cat
+                                  ? "bg-brand text-white"
+                                  : "bg-surface-2 text-ink-muted hover:text-ink"
+                              )}
+                            >
+                              {cat}
+                            </button>
+                          ))}
+                        </div>
                       </div>
-                      <div className="shrink-0 text-right">
-                        <button
-                          type="button"
-                          onClick={() => toggleType(i)}
-                          className={cn(
-                            "rounded-full px-2 py-0.5 text-[11px] font-semibold transition",
-                            r.type === "expense"
-                              ? "bg-rose-50 text-rose-600"
-                              : "text-emerald-600 bg-emerald-50"
-                          )}
-                        >
-                          {r.type === "expense" ? "Gasto" : "Ingreso"}
-                        </button>
-                        <p className="mt-0.5 text-sm font-semibold tabular-nums">
-                          {formatCurrency(r.amount)}
-                        </p>
+                    ) : (
+                      <div className="flex items-start gap-2.5">
+                        <input
+                          type="checkbox"
+                          className="mt-0.5 h-4 w-4 shrink-0 accent-brand"
+                          checked={r.selected}
+                          onChange={() => toggle(i)}
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="break-words font-medium leading-snug">
+                            {r.description}
+                          </p>
+                          <p className="mt-0.5 text-[11px] text-ink-muted">
+                            {formatDate(r.date)} · {r.category}
+                          </p>
+                        </div>
+                        <div className="flex items-start gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => startEdit(i)}
+                            className="rounded-lg p-1.5 text-ink-muted transition hover:bg-surface-2 hover:text-ink"
+                            aria-label="Editar"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
+                          <div className="shrink-0 text-right">
+                            <button
+                              type="button"
+                              onClick={() => toggleType(i)}
+                              className={cn(
+                                "rounded-full px-2 py-0.5 text-[11px] font-semibold transition",
+                                r.type === "expense"
+                                  ? "bg-rose-50 text-rose-600"
+                                  : "text-emerald-600 bg-emerald-50"
+                              )}
+                            >
+                              {r.type === "expense" ? "Gasto" : "Ingreso"}
+                            </button>
+                            <p className="mt-0.5 text-sm font-semibold tabular-nums">
+                              {formatCurrency(r.amount)}
+                            </p>
+                          </div>
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </li>
                 ))}
               </ul>
