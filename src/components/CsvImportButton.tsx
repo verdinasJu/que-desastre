@@ -2,7 +2,14 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Upload, CheckSquare, Square, Pencil, Check } from "lucide-react";
+import {
+  Upload,
+  CheckSquare,
+  Square,
+  Pencil,
+  Check,
+  AlertTriangle,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,11 +18,18 @@ import { createClient } from "@/lib/supabase/client";
 import { parseBankCsv, type CsvPreviewRow } from "@/lib/csv-import";
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from "@/lib/constants";
 import { formatCurrency, formatDate, cn } from "@/lib/utils";
+import type { Transaction } from "@/lib/types";
+
+interface CsvRowWithDup extends CsvPreviewRow {
+  duplicate?: boolean;
+  matchDesc?: string;
+}
 
 export function CsvImportButton({ onImported }: { onImported?: () => void }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [rows, setRows] = useState<CsvPreviewRow[]>([]);
+  const [rows, setRows] = useState<CsvRowWithDup[]>([]);
+  const [existing, setExisting] = useState<Transaction[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [fileName, setFileName] = useState("");
@@ -28,9 +42,16 @@ export function CsvImportButton({ onImported }: { onImported?: () => void }) {
     [rows]
   );
 
+  const dupCount = useMemo(() => rows.filter((r) => r.duplicate).length, [rows]);
+  const newCount = useMemo(
+    () => rows.filter((r) => !r.duplicate).length,
+    [rows]
+  );
+
   function handleClose() {
     setOpen(false);
     setRows([]);
+    setExisting([]);
     setError("");
     setFileName("");
     setEditingIdx(null);
@@ -70,7 +91,44 @@ export function CsvImportButton({ onImported }: { onImported?: () => void }) {
       setError(parsed.error);
       return;
     }
-    setRows(parsed.rows);
+
+    // Fetch recent transactions to detect duplicates
+    const supabase = createClient();
+    const dates = parsed.rows.map((r) => r.date).filter(Boolean);
+    const minDate = dates.length
+      ? dates.reduce((a, b) => (a < b ? a : b))
+      : undefined;
+
+    let existingTx: Transaction[] = [];
+    if (minDate) {
+      const { data } = await supabase
+        .from("transactions")
+        .select("*")
+        .gte("date", minDate)
+        .order("date", { ascending: false });
+      existingTx = (data || []) as Transaction[];
+    }
+    setExisting(existingTx);
+
+    // Mark duplicates: same date + similar amount (±0.02)
+    const enriched: CsvRowWithDup[] = parsed.rows.map((r) => {
+      const match = existingTx.find(
+        (tx) =>
+          tx.date === r.date &&
+          Math.abs(Number(tx.amount) - r.amount) < 0.02
+      );
+      if (match) {
+        return {
+          ...r,
+          selected: false,
+          duplicate: true,
+          matchDesc: match.description,
+        };
+      }
+      return { ...r, duplicate: false };
+    });
+
+    setRows(enriched);
   }
 
   function toggle(i: number) {
@@ -182,6 +240,57 @@ export function CsvImportButton({ onImported }: { onImported?: () => void }) {
 
           {rows.length > 0 ? (
             <div className="space-y-3">
+              {/* Resumen de detección */}
+              {dupCount > 0 ? (
+                <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                  <div className="text-[12px] text-amber-800">
+                    <p className="font-medium">
+                      {dupCount} movimiento{dupCount === 1 ? "" : "s"} ya
+                      registrado{dupCount === 1 ? "" : "s"}
+                    </p>
+                    <p className="mt-0.5 text-amber-700/80">
+                      Se han deseleccionado automáticamente. {newCount > 0
+                        ? `${newCount} nuevo${newCount === 1 ? "" : "s"} listo${newCount === 1 ? "" : "s"} para importar.`
+                        : "No hay movimientos nuevos."}
+                    </p>
+                  </div>
+                </div>
+              ) : null}
+
+              {/* Tus últimos movimientos (contexto) */}
+              {existing.length > 0 ? (
+                <details className="rounded-xl border border-line bg-surface-2/30">
+                  <summary className="cursor-pointer px-3 py-2 text-[12px] font-medium text-ink-muted">
+                    📋 Tus últimos {Math.min(existing.length, 15)} movimientos
+                    registrados (para comparar)
+                  </summary>
+                  <ul className="max-h-40 space-y-1 overflow-y-auto px-3 pb-2">
+                    {existing.slice(0, 15).map((tx) => (
+                      <li
+                        key={tx.id}
+                        className="flex items-center justify-between text-[11px] text-ink-muted"
+                      >
+                        <span className="min-w-0 truncate">
+                          {formatDate(tx.date)} · {tx.description}
+                        </span>
+                        <span
+                          className={cn(
+                            "ml-2 shrink-0 font-semibold tabular-nums",
+                            tx.type === "expense"
+                              ? "text-rose-600"
+                              : "text-emerald-600"
+                          )}
+                        >
+                          {tx.type === "expense" ? "−" : "+"}
+                          {formatCurrency(Number(tx.amount))}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              ) : null}
+
               {/* Cabecera con contador y seleccionar todo */}
               <div className="flex items-center justify-between">
                 <p className="text-xs text-ink-muted">
@@ -240,9 +349,11 @@ export function CsvImportButton({ onImported }: { onImported?: () => void }) {
                     key={`${r.date}-${r.amount}-${i}`}
                     className={cn(
                       "rounded-xl border px-3 py-2.5 text-[13px] transition",
-                      r.selected
-                        ? "border-line bg-surface"
-                        : "border-transparent bg-surface-2/40 opacity-50"
+                      r.duplicate
+                        ? "border-amber-200 bg-amber-50/50 opacity-60"
+                        : r.selected
+                          ? "border-line bg-surface"
+                          : "border-transparent bg-surface-2/40 opacity-50"
                     )}
                   >
                     {editingIdx === i ? (
@@ -301,6 +412,12 @@ export function CsvImportButton({ onImported }: { onImported?: () => void }) {
                           <p className="mt-0.5 text-[11px] text-ink-muted">
                             {formatDate(r.date)} · {r.category}
                           </p>
+                          {r.duplicate ? (
+                            <p className="mt-0.5 text-[10px] font-medium text-amber-600">
+                              ⚠️ Ya registrado
+                              {r.matchDesc ? ` como "${r.matchDesc}"` : ""}
+                            </p>
+                          ) : null}
                         </div>
                         <div className="flex items-start gap-1.5">
                           <button
