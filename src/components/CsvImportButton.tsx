@@ -2,17 +2,10 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Upload } from "lucide-react";
+import { Upload, CheckSquare, Square } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+import { AppSheet } from "@/components/AppSheet";
 import { createClient } from "@/lib/supabase/client";
 import { parseBankCsv, type CsvPreviewRow } from "@/lib/csv-import";
 import { formatCurrency, formatDate, cn } from "@/lib/utils";
@@ -29,6 +22,13 @@ export function CsvImportButton({ onImported }: { onImported?: () => void }) {
     () => rows.filter((r) => r.selected).length,
     [rows]
   );
+
+  function handleClose() {
+    setOpen(false);
+    setRows([]);
+    setError("");
+    setFileName("");
+  }
 
   async function onFile(file: File) {
     setError("");
@@ -49,6 +49,11 @@ export function CsvImportButton({ onImported }: { onImported?: () => void }) {
         idx === i ? { ...r, selected: !r.selected } : r
       )
     );
+  }
+
+  function toggleAll() {
+    const allSelected = rows.every((r) => r.selected);
+    setRows((prev) => prev.map((r) => ({ ...r, selected: !allSelected })));
   }
 
   function toggleType(i: number) {
@@ -95,124 +100,149 @@ export function CsvImportButton({ onImported }: { onImported?: () => void }) {
     }
 
     toast.success(`${payload.length} movimientos importados`);
-    setOpen(false);
-    setRows([]);
-    setFileName("");
+    handleClose();
     onImported?.();
     router.refresh();
   }
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(v) => {
-        setOpen(v);
-        if (!v) {
-          setRows([]);
-          setError("");
-          setFileName("");
-        }
-      }}
-    >
-      <DialogTrigger asChild>
-        <Button type="button" variant="outline" size="sm">
-          <Upload className="h-4 w-4" />
-          Importar CSV
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="max-h-[85dvh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Importar del banco</DialogTitle>
-          <DialogDescription>
-            Sube un CSV exportado de tu banco o broker (Trade Republic, etc.).
-            Revisa las filas antes de importar. Los importes negativos se
-            tratan como gastos.
-          </DialogDescription>
-        </DialogHeader>
+    <>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={() => setOpen(true)}
+      >
+        <Upload className="h-4 w-4" />
+        Importar CSV
+      </Button>
 
-        <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-line bg-surface-2/50 px-4 py-8 text-center">
-          <Upload className="h-6 w-6 text-brand" />
-          <span className="text-sm font-medium text-ink">
-            {fileName || "Elegir archivo .csv"}
-          </span>
-          <input
-            type="file"
-            accept=".csv,text/csv"
-            className="hidden"
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) onFile(f);
-            }}
-          />
-        </label>
+      <AppSheet
+        open={open}
+        onClose={handleClose}
+        title="Importar del banco"
+        subtitle="Sube un CSV de tu banco o broker. Revisa las filas antes de importar."
+      >
+        <div className="space-y-4">
+          {/* Zona de subida */}
+          <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-line bg-surface-2/50 px-4 py-6 text-center transition active:scale-[0.98]">
+            <Upload className="h-6 w-6 text-brand" />
+            <span className="text-sm font-medium text-ink">
+              {fileName || "Elegir archivo .csv"}
+            </span>
+            <span className="text-[11px] text-ink-muted">
+              Trade Republic, bancos ES, cualquier CSV con fecha e importe
+            </span>
+            <input
+              type="file"
+              accept=".csv,text/csv"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) onFile(f);
+              }}
+            />
+          </label>
 
-        {error ? (
-          <p className="text-sm text-rose-600">{error}</p>
-        ) : null}
-
-        {rows.length > 0 ? (
-          <div className="space-y-3">
-            <p className="text-xs text-ink-muted">
-              {selectedCount} de {rows.length} seleccionados. Toca el tipo para
-              cambiar gasto ↔ ingreso.
+          {error ? (
+            <p className="rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-600">
+              {error}
             </p>
-            <ul className="max-h-64 space-y-2 overflow-y-auto">
-              {rows.map((r, i) => (
-                <li
-                  key={`${r.date}-${r.amount}-${i}`}
-                  className={cn(
-                    "rounded-xl border px-3 py-2 text-sm",
-                    r.selected
-                      ? "border-line bg-surface"
-                      : "border-transparent bg-surface-2/40 opacity-60"
-                  )}
+          ) : null}
+
+          {rows.length > 0 ? (
+            <div className="space-y-3">
+              {/* Cabecera con contador y seleccionar todo */}
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-ink-muted">
+                  {selectedCount} de {rows.length} seleccionados
+                </p>
+                <button
+                  type="button"
+                  onClick={toggleAll}
+                  className="flex items-center gap-1 text-xs font-medium text-brand"
                 >
-                  <div className="flex items-start gap-2">
-                    <input
-                      type="checkbox"
-                      className="mt-1"
-                      checked={r.selected}
-                      onChange={() => toggle(i)}
-                    />
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate font-medium">{r.description}</p>
-                      <p className="text-xs text-ink-muted">
-                        {formatDate(r.date)} · {r.category}
-                      </p>
+                  {rows.every((r) => r.selected) ? (
+                    <CheckSquare className="h-3.5 w-3.5" />
+                  ) : (
+                    <Square className="h-3.5 w-3.5" />
+                  )}
+                  {rows.every((r) => r.selected)
+                    ? "Deseleccionar"
+                    : "Seleccionar"}{" "}
+                  todo
+                </button>
+              </div>
+
+              <p className="text-[11px] text-ink-muted">
+                Toca el tipo para cambiar gasto ↔ ingreso.
+              </p>
+
+              {/* Lista de movimientos */}
+              <ul className="space-y-2">
+                {rows.map((r, i) => (
+                  <li
+                    key={`${r.date}-${r.amount}-${i}`}
+                    className={cn(
+                      "rounded-xl border px-3 py-2.5 text-[13px] transition",
+                      r.selected
+                        ? "border-line bg-surface"
+                        : "border-transparent bg-surface-2/40 opacity-50"
+                    )}
+                  >
+                    <div className="flex items-start gap-2.5">
+                      <input
+                        type="checkbox"
+                        className="mt-0.5 h-4 w-4 shrink-0 accent-brand"
+                        checked={r.selected}
+                        onChange={() => toggle(i)}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="break-words font-medium leading-snug">
+                          {r.description}
+                        </p>
+                        <p className="mt-0.5 text-[11px] text-ink-muted">
+                          {formatDate(r.date)} · {r.category}
+                        </p>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <button
+                          type="button"
+                          onClick={() => toggleType(i)}
+                          className={cn(
+                            "rounded-full px-2 py-0.5 text-[11px] font-semibold transition",
+                            r.type === "expense"
+                              ? "bg-rose-50 text-rose-600"
+                              : "text-emerald-600 bg-emerald-50"
+                          )}
+                        >
+                          {r.type === "expense" ? "Gasto" : "Ingreso"}
+                        </button>
+                        <p className="mt-0.5 text-sm font-semibold tabular-nums">
+                          {formatCurrency(r.amount)}
+                        </p>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <button
-                        type="button"
-                        onClick={() => toggleType(i)}
-                        className={cn(
-                          "text-xs font-semibold",
-                          r.type === "expense"
-                            ? "text-rose-600"
-                            : "text-emerald-600"
-                        )}
-                      >
-                        {r.type === "expense" ? "Gasto" : "Ingreso"}
-                      </button>
-                      <p className="text-sm font-semibold tabular-nums">
-                        {formatCurrency(r.amount)}
-                      </p>
-                    </div>
-                  </div>
-                </li>
-              ))}
-            </ul>
-            <Button
-              className="w-full"
-              disabled={!selectedCount || loading}
-              onClick={importSelected}
-            >
-              {loading
-                ? "Importando…"
-                : `Importar ${selectedCount} movimiento${selectedCount === 1 ? "" : "s"}`}
-            </Button>
-          </div>
-        ) : null}
-      </DialogContent>
-    </Dialog>
+                  </li>
+                ))}
+              </ul>
+
+              {/* Botón importar */}
+              <div className="sticky bottom-0 -mx-4 bg-surface/95 px-4 pb-1 pt-2 backdrop-blur-sm">
+                <Button
+                  className="w-full"
+                  disabled={!selectedCount || loading}
+                  onClick={importSelected}
+                >
+                  {loading
+                    ? "Importando…"
+                    : `Importar ${selectedCount} movimiento${selectedCount === 1 ? "" : "s"}`}
+                </Button>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      </AppSheet>
+    </>
   );
 }
