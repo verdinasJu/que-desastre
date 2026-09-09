@@ -59,7 +59,10 @@ export function TransactionForm({
   useEffect(() => {
     async function load() {
       const supabase = createClient();
-      const { data } = await supabase.from("custom_categories").select("*");
+      const { data } = await supabase
+        .from("custom_categories")
+        .select("*")
+        .order("name");
       setCustom((data || []) as CustomCategory[]);
     }
     load();
@@ -71,6 +74,12 @@ export function TransactionForm({
       .map((c) => c.name);
     return mergeCategories(type, names, category);
   }, [custom, type, category]);
+
+  useEffect(() => {
+    if (!options.includes(category) && options.length) {
+      setCategory(options[0]);
+    }
+  }, [options, category]);
 
   function changeType(next: TransactionType) {
     setType(next);
@@ -88,8 +97,8 @@ export function TransactionForm({
     await onSubmit({
       type,
       amount: num,
-      description: description.trim() || category.trim() || "Otros",
-      category: category.trim() || "Otros",
+      description: description.trim() || category,
+      category,
       date,
     });
     if (!initial) {
@@ -158,16 +167,7 @@ export function TransactionForm({
 
       <div className="space-y-3">
         <div className="min-w-0 space-y-2">
-          <Label htmlFor="category">Categoría (puedes escribir cualquiera)</Label>
-          <Input
-            id="category"
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-            placeholder="Ej. Bet, Cumpleaños, Uber…"
-            required
-            autoCorrect="off"
-            onFocus={(e) => e.currentTarget.select()}
-          />
+          <Label>Categoría</Label>
           <div className="flex flex-wrap gap-1.5">
             {options.map((c) => (
               <button
@@ -175,8 +175,8 @@ export function TransactionForm({
                 type="button"
                 onClick={() => setCategory(c)}
                 className={cn(
-                  "rounded-full px-2.5 py-1 text-[11px] font-medium transition",
-                  category.trim().toLowerCase() === c.toLowerCase()
+                  "rounded-full px-2.5 py-1.5 text-xs font-medium transition",
+                  category === c
                     ? "bg-brand text-white"
                     : "bg-surface-2 text-ink-muted hover:text-ink"
                 )}
@@ -186,8 +186,8 @@ export function TransactionForm({
             ))}
           </div>
           <p className="text-[11px] text-ink-muted">
-            Los chips son atajos. Para «Bet» u otra: bórralo y escríbelo en el
-            cuadro de arriba.
+            Tus categorías creadas salen primero. Para añadir más: Ajustes →
+            Categorías.
           </p>
         </div>
         <div className="min-w-0 space-y-2">

@@ -16,9 +16,22 @@ export function mergeCategories(
   customNames: string[],
   current?: string
 ): string[] {
-  const set = new Set<string>([...DEFAULTS[type], ...customNames]);
-  if (current) set.add(current);
-  return Array.from(set);
+  // Primero las creadas por el usuario, luego las por defecto.
+  const ordered = [
+    ...customNames.map((n) => n.trim()).filter(Boolean),
+    ...DEFAULTS[type],
+  ];
+  if (current?.trim()) ordered.push(current.trim());
+
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const name of ordered) {
+    const key = name.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(name);
+  }
+  return out;
 }
 
 export function defaultCategories(type: TransactionType): readonly string[] {
