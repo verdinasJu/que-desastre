@@ -36,6 +36,7 @@ export function CsvImportButton({ onImported }: { onImported?: () => void }) {
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
   const [editDesc, setEditDesc] = useState("");
   const [editCat, setEditCat] = useState("");
+  const [bulkCat, setBulkCat] = useState("");
 
   const selectedCount = useMemo(
     () => rows.filter((r) => r.selected).length,
@@ -55,6 +56,14 @@ export function CsvImportButton({ onImported }: { onImported?: () => void }) {
     setError("");
     setFileName("");
     setEditingIdx(null);
+    setBulkCat("");
+  }
+
+  function applyBulkCategory() {
+    const value = bulkCat.trim();
+    if (!value) return;
+    applyToSelected("category", value);
+    setBulkCat("");
   }
 
   function startEdit(i: number) {
@@ -322,8 +331,31 @@ export function CsvImportButton({ onImported }: { onImported?: () => void }) {
               {selectedCount > 0 ? (
                 <div className="space-y-2 rounded-xl border border-brand/20 bg-brand/5 px-3 py-2.5">
                   <p className="text-[11px] font-medium text-brand">
-                    Aplicar a los {selectedCount} seleccionados:
+                    Categoría a los {selectedCount} seleccionados:
                   </p>
+                  <div className="flex gap-2">
+                    <Input
+                      value={bulkCat}
+                      onChange={(e) => setBulkCat(e.target.value)}
+                      placeholder="Escribe cualquier categoría…"
+                      className="h-9 text-sm"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          applyBulkCategory();
+                        }
+                      }}
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="shrink-0"
+                      disabled={!bulkCat.trim()}
+                      onClick={applyBulkCategory}
+                    >
+                      Aplicar
+                    </Button>
+                  </div>
                   <div className="flex flex-wrap gap-1.5">
                     {(rows.some((r) => r.selected && r.type === "expense")
                       ? EXPENSE_CATEGORIES
@@ -374,6 +406,12 @@ export function CsvImportButton({ onImported }: { onImported?: () => void }) {
                           value={editDesc}
                           onChange={(e) => setEditDesc(e.target.value)}
                           placeholder="Descripción"
+                          className="text-sm"
+                        />
+                        <Input
+                          value={editCat}
+                          onChange={(e) => setEditCat(e.target.value)}
+                          placeholder="Categoría (cualquier texto)"
                           className="text-sm"
                         />
                         <div className="flex flex-wrap gap-1.5">

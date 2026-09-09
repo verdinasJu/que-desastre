@@ -72,12 +72,6 @@ export function TransactionForm({
     return mergeCategories(type, names, category);
   }, [custom, type, category]);
 
-  useEffect(() => {
-    if (!options.includes(category) && options.length) {
-      setCategory(options[0]);
-    }
-  }, [options, category]);
-
   function changeType(next: TransactionType) {
     setType(next);
     const names = custom
@@ -94,8 +88,8 @@ export function TransactionForm({
     await onSubmit({
       type,
       amount: num,
-      description: description.trim() || category,
-      category,
+      description: description.trim() || category.trim() || "Otros",
+      category: category.trim() || "Otros",
       date,
     });
     if (!initial) {
@@ -165,18 +159,33 @@ export function TransactionForm({
       <div className="space-y-3">
         <div className="min-w-0 space-y-2">
           <Label htmlFor="category">Categoría</Label>
-          <select
+          <Input
             id="category"
             value={category}
             onChange={(e) => setCategory(e.target.value)}
-            className="flex h-11 w-full rounded-xl border border-line bg-surface px-3 text-sm text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/35"
-          >
+            placeholder="Escribe o elige una categoría…"
+            required
+          />
+          <div className="flex flex-wrap gap-1.5">
             {options.map((c) => (
-              <option key={c} value={c}>
+              <button
+                key={c}
+                type="button"
+                onClick={() => setCategory(c)}
+                className={cn(
+                  "rounded-full px-2.5 py-1 text-[11px] font-medium transition",
+                  category === c
+                    ? "bg-brand text-white"
+                    : "bg-surface-2 text-ink-muted hover:text-ink"
+                )}
+              >
                 {c}
-              </option>
+              </button>
             ))}
-          </select>
+          </div>
+          <p className="text-[11px] text-ink-muted">
+            Puedes escribir cualquier categoría, no solo las de la lista.
+          </p>
         </div>
         <div className="min-w-0 space-y-2">
           <Label htmlFor="date">Fecha</Label>
