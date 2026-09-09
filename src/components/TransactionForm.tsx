@@ -158,13 +158,15 @@ export function TransactionForm({
 
       <div className="space-y-3">
         <div className="min-w-0 space-y-2">
-          <Label htmlFor="category">Categoría</Label>
+          <Label htmlFor="category">Categoría (puedes escribir cualquiera)</Label>
           <Input
             id="category"
             value={category}
             onChange={(e) => setCategory(e.target.value)}
-            placeholder="Escribe o elige una categoría…"
+            placeholder="Ej. Bet, Cumpleaños, Uber…"
             required
+            autoCorrect="off"
+            onFocus={(e) => e.currentTarget.select()}
           />
           <div className="flex flex-wrap gap-1.5">
             {options.map((c) => (
@@ -174,7 +176,7 @@ export function TransactionForm({
                 onClick={() => setCategory(c)}
                 className={cn(
                   "rounded-full px-2.5 py-1 text-[11px] font-medium transition",
-                  category === c
+                  category.trim().toLowerCase() === c.toLowerCase()
                     ? "bg-brand text-white"
                     : "bg-surface-2 text-ink-muted hover:text-ink"
                 )}
@@ -184,7 +186,8 @@ export function TransactionForm({
             ))}
           </div>
           <p className="text-[11px] text-ink-muted">
-            Puedes escribir cualquier categoría, no solo las de la lista.
+            Los chips son atajos. Para «Bet» u otra: bórralo y escríbelo en el
+            cuadro de arriba.
           </p>
         </div>
         <div className="min-w-0 space-y-2">
