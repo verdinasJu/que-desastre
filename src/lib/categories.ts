@@ -34,6 +34,30 @@ export function mergeCategories(
   return out;
 }
 
+/** Todas las categorías (propias, usadas y por defecto) para importar CSV. */
+export function mergeAllCategories(
+  extraNames: string[],
+  current?: string
+): string[] {
+  const ordered = [
+    ...extraNames.map((n) => n.trim()).filter(Boolean),
+    ...EXPENSE_CATEGORIES,
+    ...INCOME_CATEGORIES,
+    ...INVESTMENT_CATEGORIES,
+  ];
+  if (current?.trim()) ordered.push(current.trim());
+
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const name of ordered) {
+    const key = name.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(name);
+  }
+  return out;
+}
+
 export function defaultCategories(type: TransactionType): readonly string[] {
   return DEFAULTS[type];
 }

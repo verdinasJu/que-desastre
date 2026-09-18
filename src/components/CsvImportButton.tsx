@@ -21,7 +21,7 @@ import { parseBankCsv, isLikelyDuplicateTx, guessCategory, isLikelySalaryDescrip
 import { mergeAllCategories } from "@/lib/categories";
 import { formatCurrency, formatDate, cn } from "@/lib/utils";
 import { AUTO_SALARY_DESCRIPTION } from "@/lib/constants";
-import type { CustomCategory, Transaction, TransactionType } from "@/lib/types";
+import type { CustomCategory, Transaction } from "@/lib/types";
 
 interface CsvRowWithDup extends CsvPreviewRow {
   duplicate?: boolean;
@@ -281,7 +281,7 @@ export function CsvImportButton({ onImported }: { onImported?: () => void }) {
         open={open}
         onClose={handleClose}
         title="Importar del banco"
-        subtitle="Elige categoría entre las que tienes creadas (Ajustes → Categorías)."
+        subtitle="Elige categoría en el listado. Incluye las de Ajustes y las que ya hayas usado."
       >
         <div className="space-y-4">
           <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-line bg-surface-2/50 px-4 py-6 text-center transition active:scale-[0.98]">
@@ -384,23 +384,28 @@ export function CsvImportButton({ onImported }: { onImported?: () => void }) {
 
               {selectedCount > 0 ? (
                 <div className="space-y-2 rounded-xl border border-brand/20 bg-brand/5 px-3 py-2.5">
-                  <Label className="text-[11px] font-medium text-brand">
+                  <Label
+                    htmlFor="csv-bulk-category"
+                    className="text-[11px] font-medium text-brand"
+                  >
                     Categoría → {selectedCount} seleccionados
                   </Label>
-                  <div className="flex flex-wrap gap-1.5">
-                    {bulkChips.map((cat) => (
-                      <button
-                        key={cat}
-                        type="button"
-                        onClick={() => applyToSelected(cat)}
-                        className="rounded-full bg-surface px-2.5 py-1.5 text-[11px] font-medium text-ink-muted transition hover:bg-surface-2 hover:text-ink"
-                      >
+                  <NativeSelect
+                    id="csv-bulk-category"
+                    value=""
+                    onChange={(e) => applyToSelected(e.target.value)}
+                  >
+                    <option value="" disabled>
+                      Elige una categoría
+                    </option>
+                    {allCategoryOptions.map((cat) => (
+                      <option key={cat} value={cat}>
                         {cat}
-                      </button>
+                      </option>
                     ))}
-                  </div>
+                  </NativeSelect>
                   <p className="text-[10px] text-ink-muted">
-                    Si falta alguna (ej. Bet), créala en Ajustes → Categorías y
+                    Salen todas las categorías. Si creas una nueva en Ajustes,
                     vuelve a abrir Importar CSV.
                   </p>
                 </div>
@@ -408,7 +413,9 @@ export function CsvImportButton({ onImported }: { onImported?: () => void }) {
 
               <ul className="space-y-2">
                 {rows.map((r, i) => {
-                  const chips = catsForType(r.type, r.category);
+                  const cats = catsForRow(
+                    editingIdx === i ? editCat : r.category
+                  );
                   return (
                     <li
                       key={`${r.date}-${r.amount}-${i}`}
@@ -449,26 +456,23 @@ export function CsvImportButton({ onImported }: { onImported?: () => void }) {
                             />
                           </div>
                           <div className="space-y-1.5">
-                            <Label className="text-[11px] text-ink-muted">
+                            <Label
+                              htmlFor="csv-row-category"
+                              className="text-[11px] text-ink-muted"
+                            >
                               Categoría
                             </Label>
-                            <div className="flex flex-wrap gap-1.5">
-                              {chips.map((cat) => (
-                                <button
-                                  key={cat}
-                                  type="button"
-                                  onClick={() => setEditCat(cat)}
-                                  className={cn(
-                                    "rounded-full px-2.5 py-1.5 text-[11px] font-medium transition",
-                                    editCat === cat
-                                      ? "bg-brand text-white"
-                                      : "bg-surface-2 text-ink-muted hover:text-ink"
-                                  )}
-                                >
+                            <NativeSelect
+                              id="csv-row-category"
+                              value={editCat}
+                              onChange={(e) => setEditCat(e.target.value)}
+                            >
+                              {cats.map((cat) => (
+                                <option key={cat} value={cat}>
                                   {cat}
-                                </button>
+                                </option>
                               ))}
-                            </div>
+                            </NativeSelect>
                           </div>
                         </div>
                       ) : (
