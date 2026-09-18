@@ -6,12 +6,14 @@ import type {
   Transaction,
 } from "./types";
 import { AUTO_SALARY_DESCRIPTION } from "./constants";
+import { isLikelySalaryDescription } from "./csv-import";
 import {
   isManualFixedDuplicateTx,
   sumActiveFixedExpenses,
   unpaidFixedForMonth,
 } from "./fixed-expense-utils";
 import { positionCurrentValue } from "./investment-prices";
+import { localISODate } from "./utils";
 
 /** Valor de mercado de la cartera. Sin posiciones: legado initial_investments (oculto). */
 export function calcInvestmentsMarketValue(
@@ -31,14 +33,12 @@ export function calcInvestmentsMarketValue(
       0
     );
   }
-  // Compatibilidad: usuarios que aún no migraron a la cartera
   return Number(profile.initial_investments) || 0;
 }
 
 /**
  * Patrimonio total = ahorro inicial + valor de cartera + ingresos − gastos
  * − fijos del mes aún no registrados (devengo parcial, ej. alquiler pendiente).
- * Las inversiones viven solo en Más → Inversiones (valor de mercado).
  */
 export function calcPatrimonio(
   profile: Profile,
@@ -69,12 +69,20 @@ export function calcPatrimonio(
   return total;
 }
 
+function isSalaryLikeIncome(t: Transaction): boolean {
+  if (t.type !== "income") return false;
+  if (t.description === AUTO_SALARY_DESCRIPTION) return true;
+  return isLikelySalaryDescription(t.description);
+}
+
 /**
  * Disponible para gastar (mes) =
  * ingreso base del mes + otros ingresos − fijos − inversiones − gastos variables
  *
- * Ingreso base = ingreso automático si ya se generó, si no la cifra configurada
- * (para no contar dos veces nómina + ingreso automático).
+ * Ingreso base = nómina automática, o nómina importada del banco, o la cifra
+ * configurada en el mes en curso (sin contar dos veces la misma nómina).
+ *
+ * Ahorro del mes = lo mismo sin restar inversiones (siguen siendo tuyas).
  */
 export function calcMonthStats(
   profile: Profile,
@@ -88,14 +96,76 @@ export function calcMonthStats(
     (t) => t.date >= monthStart && t.date <= monthEnd
   );
 
-  const gastosFijosDelMes = sumActiveFixedExpenses(fixedExpenses);
+  const now = new Date();
+  const currentStart = localISODate(new Date(now.getFullYear(), now.getMonth(), 1));
+  const isViewingCurrentMonth = monthStart === currentStart;
 
-  const gastosVariablesDelMes = monthTx
+  const autoIncome = monthTx
+    .filter(
+      (t) =>
+        t.type === "income" && t.description === AUTO_SALARY_DESCRIPTION
+    )
+    .reduce((acc, t) => acc + Number(t.amount), 0);
+
+  const salaryImported = monthTx
+    .filter(
+      (t) =>
+        t.type === "income" &&
+        t.description !== AUTO_SALARY_DESCRIPTION &&
+        isSalaryLikeIncome(t)
+    )
+    .reduce((acc, t) => acc + Number(t.amount), 0);
+
+  const otherIncome = monthTx
+    .filter(
+      (t) =>
+        t.type === "income" &&
+        t.description !== AUTO_SALARY_DESCRIPTION &&
+        !isSalaryLikeIncome(t)
+    )
+    .reduce((acc, t) => acc + Number(t.amount), 0);
+
+  let ingresoBaseDelMes = 0;
+  if (autoIncome > 0) {
+    ingresoBaseDelMes = autoIncome;
+  } else if (salaryImported > 0) {
+    ingresoBaseDelMes = salaryImported;
+  } else if (isViewingCurrentMonth) {
+    ingresoBaseDelMes = Number(profile.monthly_salary) || 0;
+  }
+
+  const ingresosDelMes = ingresoBaseDelMes + otherIncome;
+
+  const invertidoEsteMes = sumByType(monthTx, "investment");
+
+  const variableExpenses = monthTx.filter(
+    (t) =>
+      t.type === "expense" &&
+      !t.fixed_expense_id &&
+      !isManualFixedDuplicateTx(
+        monthTx,
+        t,
+        fixedExpenses,
+        monthStart,
+        monthEnd
+      )
+  );
+
+  const gastosVariablesDelMes = variableExpenses.reduce(
+    (acc, t) => acc + Number(t.amount),
+    0
+  );
+
+  const autoFixedPaid = monthTx
+    .filter((t) => t.type === "expense" && t.fixed_expense_id)
+    .reduce((acc, t) => acc + Number(t.amount), 0);
+
+  const manualFixedPaid = monthTx
     .filter(
       (t) =>
         t.type === "expense" &&
         !t.fixed_expense_id &&
-        !isManualFixedDuplicateTx(
+        isManualFixedDuplicateTx(
           monthTx,
           t,
           fixedExpenses,
@@ -105,28 +175,13 @@ export function calcMonthStats(
     )
     .reduce((acc, t) => acc + Number(t.amount), 0);
 
-  const invertidoEsteMes = sumByType(monthTx, "investment");
+  const gastosFijosDelMes = isViewingCurrentMonth
+    ? sumActiveFixedExpenses(fixedExpenses)
+    : autoFixedPaid + manualFixedPaid;
 
-  const autoIncome = monthTx
-    .filter(
-      (t) =>
-        t.type === "income" && t.description === AUTO_SALARY_DESCRIPTION
-    )
-    .reduce((acc, t) => acc + Number(t.amount), 0);
-
-  const otherIncome = monthTx
-    .filter(
-      (t) =>
-        t.type === "income" && t.description !== AUTO_SALARY_DESCRIPTION
-    )
-    .reduce((acc, t) => acc + Number(t.amount), 0);
-
-  const ingresoBaseDelMes =
-    autoIncome > 0 ? autoIncome : Number(profile.monthly_salary);
-
-  const ingresosDelMes = autoIncome + otherIncome;
-
-  const gastadoEsteMes = gastosFijosDelMes + gastosVariablesDelMes;
+  const gastadoEsteMes = isViewingCurrentMonth
+    ? gastosFijosDelMes + gastosVariablesDelMes
+    : sumByType(monthTx, "expense");
 
   const disponibleParaGastar =
     ingresoBaseDelMes +
@@ -135,24 +190,8 @@ export function calcMonthStats(
     invertidoEsteMes -
     gastosVariablesDelMes;
 
-  // Mismos ingresos extras que el disponible: un bizum/extra de 50 € también
-  // aumenta el ahorro del mes (antes solo contaba la nómina base).
   const ahorroDelMes =
-    ingresoBaseDelMes +
-    otherIncome -
-    gastosFijosDelMes -
-    invertidoEsteMes -
-    gastosVariablesDelMes;
-
-  const { start: currentStart } = (() => {
-    const now = new Date();
-    return {
-      start: new Date(now.getFullYear(), now.getMonth(), 1)
-        .toISOString()
-        .slice(0, 10),
-    };
-  })();
-  const isViewingCurrentMonth = monthStart === currentStart;
+    ingresoBaseDelMes + otherIncome - gastosFijosDelMes - gastosVariablesDelMes;
 
   return {
     patrimonioTotal: calcPatrimonio(
@@ -201,18 +240,29 @@ export function expensesByCategory(
 export function spentByCategoryThisMonth(
   transactions: Transaction[],
   monthStart: string,
-  monthEnd: string
+  monthEnd: string,
+  fixedExpenses: FixedExpense[] = []
 ): Map<string, number> {
+  const monthTx = transactions.filter(
+    (t) => t.date >= monthStart && t.date <= monthEnd
+  );
   const map = new Map<string, number>();
-  for (const t of transactions) {
+  for (const t of monthTx) {
+    if (t.type !== "expense") continue;
+    if (t.fixed_expense_id) continue;
     if (
-      t.type === "expense" &&
-      t.date >= monthStart &&
-      t.date <= monthEnd
+      isManualFixedDuplicateTx(
+        monthTx,
+        t,
+        fixedExpenses,
+        monthStart,
+        monthEnd
+      )
     ) {
-      const cat = t.category || "Otros";
-      map.set(cat, (map.get(cat) || 0) + Number(t.amount));
+      continue;
     }
+    const cat = t.category || "Otros";
+    map.set(cat, (map.get(cat) || 0) + Number(t.amount));
   }
   return map;
 }
@@ -222,7 +272,8 @@ export function monthlyEvolution(
   transactions: Transaction[],
   months = 6,
   /** Mes ancla (último de la serie). Por defecto: hoy. */
-  anchor: Date = new Date()
+  anchor: Date = new Date(),
+  fixedExpenses: FixedExpense[] = []
 ): { month: string; gastado: number; invertido: number; ingresos: number }[] {
   const result: {
     month: string;
@@ -233,29 +284,24 @@ export function monthlyEvolution(
 
   for (let i = months - 1; i >= 0; i--) {
     const d = new Date(anchor.getFullYear(), anchor.getMonth() - i, 1);
-    const start = new Date(d.getFullYear(), d.getMonth(), 1)
-      .toISOString()
-      .slice(0, 10);
-    const end = new Date(d.getFullYear(), d.getMonth() + 1, 0)
-      .toISOString()
-      .slice(0, 10);
-    const monthTx = transactions.filter((t) => t.date >= start && t.date <= end);
+    const start = localISODate(new Date(d.getFullYear(), d.getMonth(), 1));
+    const end = localISODate(new Date(d.getFullYear(), d.getMonth() + 1, 0));
+    const stats = calcMonthStats(
+      profile,
+      transactions,
+      start,
+      end,
+      fixedExpenses
+    );
     const label = d.toLocaleDateString("es-ES", {
       month: "short",
       year: "2-digit",
     });
-    const auto = monthTx
-      .filter(
-        (t) =>
-          t.type === "income" && t.description === AUTO_SALARY_DESCRIPTION
-      )
-      .reduce((a, t) => a + Number(t.amount), 0);
-    const other = sumByType(monthTx, "income") - auto;
     result.push({
       month: label,
-      gastado: sumByType(monthTx, "expense"),
-      invertido: sumByType(monthTx, "investment"),
-      ingresos: (auto > 0 ? auto : Number(profile.monthly_salary)) + other,
+      gastado: stats.gastadoEsteMes,
+      invertido: stats.invertidoEsteMes,
+      ingresos: stats.ingresosDelMes,
     });
   }
 

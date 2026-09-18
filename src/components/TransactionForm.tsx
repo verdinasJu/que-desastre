@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DateInput } from "@/components/ui/date-input";
 import { Label } from "@/components/ui/label";
-import { cn } from "@/lib/utils";
+import { cn, localISODate } from "@/lib/utils";
 import { amountToWorkHours, formatWorkHours } from "@/lib/work-hours";
 import { mergeCategories } from "@/lib/categories";
 import { createClient } from "@/lib/supabase/client";
@@ -52,7 +52,7 @@ export function TransactionForm({
   const [description, setDescription] = useState(initial?.description ?? "");
   const [category, setCategory] = useState(initial?.category ?? "Otros");
   const [date, setDate] = useState(
-    initial?.date ?? new Date().toISOString().slice(0, 10)
+    initial?.date ?? localISODate()
   );
   const [custom, setCustom] = useState<CustomCategory[]>([]);
 

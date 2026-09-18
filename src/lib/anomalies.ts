@@ -1,4 +1,5 @@
 import type { Transaction } from "@/lib/types";
+import { localISODate } from "@/lib/utils";
 
 export interface SpendingAnomaly {
   category: string;
@@ -18,8 +19,8 @@ function weekRange(offsetWeeks = 0) {
   const sunday = new Date(monday);
   sunday.setDate(monday.getDate() + 6);
   return {
-    start: monday.toISOString().slice(0, 10),
-    end: sunday.toISOString().slice(0, 10),
+    start: localISODate(monday),
+    end: localISODate(sunday),
   };
 }
 

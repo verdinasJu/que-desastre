@@ -4,6 +4,7 @@ import { currentMonthRange } from "@/lib/utils";
 import { BudgetsClient } from "@/components/BudgetsClient";
 import type {
   CategoryBudget,
+  FixedExpense,
   Profile,
   SharedBudget,
   Transaction,
@@ -15,7 +16,7 @@ export default async function PresupuestosPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const [{ data: profile }, { data: budgets }, { data: shared }, { data: txs }] =
+  const [{ data: profile }, { data: budgets }, { data: shared }, { data: txs }, { data: fixed }] =
     await Promise.all([
       supabase.from("profiles").select("*").eq("id", user!.id).single(),
       supabase
@@ -28,13 +29,19 @@ export default async function PresupuestosPage() {
         .select("*")
         .order("created_at", { ascending: false }),
       supabase.from("transactions").select("*").eq("user_id", user!.id),
+      supabase
+        .from("fixed_expenses")
+        .select("*")
+        .eq("user_id", user!.id)
+        .eq("active", true),
     ]);
 
   const { start, end } = currentMonthRange();
   const spentMap = spentByCategoryThisMonth(
     (txs || []) as Transaction[],
     start,
-    end
+    end,
+    (fixed || []) as FixedExpense[]
   );
   const spentByCategory = Object.fromEntries(spentMap.entries());
   const p = profile as Profile;

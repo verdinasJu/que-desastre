@@ -14,11 +14,13 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { NativeSelect } from "@/components/ui/native-select";
 import { AppSheet } from "@/components/AppSheet";
 import { createClient } from "@/lib/supabase/client";
-import { parseBankCsv, type CsvPreviewRow } from "@/lib/csv-import";
-import { mergeCategories } from "@/lib/categories";
+import { parseBankCsv, isLikelyDuplicateTx, guessCategory, isLikelySalaryDescription, type CsvPreviewRow } from "@/lib/csv-import";
+import { mergeAllCategories } from "@/lib/categories";
 import { formatCurrency, formatDate, cn } from "@/lib/utils";
+import { AUTO_SALARY_DESCRIPTION } from "@/lib/constants";
 import type { CustomCategory, Transaction, TransactionType } from "@/lib/types";
 
 interface CsvRowWithDup extends CsvPreviewRow {
@@ -52,24 +54,16 @@ export function CsvImportButton({ onImported }: { onImported?: () => void }) {
     [rows]
   );
 
-  const bulkType: TransactionType = rows.some(
-    (r) => r.selected && r.type === "income"
-  )
-    ? "income"
-    : "expense";
+  const allCategoryOptions = useMemo(() => {
+    const extra = [...customCats.map((c) => c.name), ...usedCats];
+    return mergeAllCategories(extra);
+  }, [customCats, usedCats]);
 
-  const bulkChips = useMemo(() => {
-    const custom = customCats
-      .filter((c) => c.type === bulkType)
-      .map((c) => c.name);
-    return mergeCategories(bulkType, [...custom, ...usedCats]);
-  }, [customCats, usedCats, bulkType]);
-
-  function catsForType(type: TransactionType, current?: string) {
-    const custom = customCats
-      .filter((c) => c.type === type)
-      .map((c) => c.name);
-    return mergeCategories(type, [...custom, ...usedCats], current);
+  function catsForRow(current?: string) {
+    return mergeAllCategories(
+      [...customCats.map((c) => c.name), ...usedCats],
+      current
+    );
   }
 
   useEffect(() => {
@@ -125,6 +119,7 @@ export function CsvImportButton({ onImported }: { onImported?: () => void }) {
   }
 
   function applyToSelected(category: string) {
+    if (!category) return;
     setRows((prev) =>
       prev.map((r) => (r.selected ? { ...r, category } : r))
     );
@@ -168,18 +163,38 @@ export function CsvImportButton({ onImported }: { onImported?: () => void }) {
     );
     setUsedCats((prev) => Array.from(new Set([...used, ...prev])));
 
-    const enriched: CsvRowWithDup[] = parsed.rows.map((r) => {
-      const match = existingTx.find(
-        (tx) =>
-          tx.date === r.date &&
-          Math.abs(Number(tx.amount) - r.amount) < 0.02
+    const enriched: CsvRowWithDup[] = parsed.rows.map((r, idx) => {
+      const match = existingTx.find((tx) => isLikelyDuplicateTx(r, tx));
+      const salaryMatch =
+        !match &&
+        r.type === "income" &&
+        isLikelySalaryDescription(r.description)
+          ? existingTx.find(
+              (tx) =>
+                tx.type === "income" &&
+                tx.description === AUTO_SALARY_DESCRIPTION &&
+                tx.date.slice(0, 7) === r.date.slice(0, 7) &&
+                Math.abs(Number(tx.amount) - r.amount) < 1
+            )
+          : undefined;
+      const dupInFile = parsed.rows.findIndex(
+        (other, j) =>
+          j < idx &&
+          isLikelyDuplicateTx(r, {
+            date: other.date,
+            amount: other.amount,
+            type: other.type,
+            description: other.description,
+          })
       );
-      if (match) {
+      const found = match || salaryMatch;
+      if (found || dupInFile >= 0) {
         return {
           ...r,
           selected: false,
           duplicate: true,
-          matchDesc: match.description,
+          matchDesc:
+            found?.description || parsed.rows[dupInFile]?.description,
         };
       }
       return { ...r, duplicate: false };
@@ -206,7 +221,7 @@ export function CsvImportButton({ onImported }: { onImported?: () => void }) {
       prev.map((r, idx) => {
         if (idx !== i) return r;
         const type = r.type === "expense" ? "income" : "expense";
-        return { ...r, type };
+        return { ...r, type, category: guessCategory(r.description, type) };
       })
     );
   }

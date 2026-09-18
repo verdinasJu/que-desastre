@@ -4,7 +4,7 @@ import {
   AUTO_SALARY_CATEGORY,
   AUTO_SALARY_DESCRIPTION,
 } from "@/lib/constants";
-import { currentMonthRange } from "@/lib/utils";
+import { currentMonthRange, localISODate } from "@/lib/utils";
 
 function paydayDateForMonth(
   year: number,
@@ -13,8 +13,7 @@ function paydayDateForMonth(
 ) {
   const lastDay = new Date(year, monthIndex + 1, 0).getDate();
   const day = Math.min(Math.max(paydayDay, 1), Math.min(28, lastDay));
-  const d = new Date(year, monthIndex, day);
-  return d.toISOString().slice(0, 10);
+  return localISODate(new Date(year, monthIndex, day));
 }
 
 /** Primera fecha de cobro ESTRICTAMENTE posterior a la fecha de onboarding. */
@@ -67,7 +66,7 @@ export async function ensureMonthlyIncome(
     now.getMonth(),
     payday
   );
-  const today = now.toISOString().slice(0, 10);
+  const today = localISODate(now);
 
   // Aún no llega el cobro de este mes, o este cobro es anterior/igual al alta
   if (today < payDate) return false;

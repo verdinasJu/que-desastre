@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { ensureMonthlyIncome } from "@/lib/auto-income";
 import { ensureFixedExpenseTransactions } from "@/lib/auto-fixed-expenses";
 import { ensureInvestmentPrices } from "@/lib/auto-investment-prices";
+import { repairTimezoneShiftedAutoDates } from "@/lib/auto-date-repair";
 import { currentMonthRange } from "@/lib/utils";
 import type { FixedExpense, Profile, Transaction } from "@/lib/types";
 
@@ -27,21 +28,14 @@ export async function AutoFinanceSync() {
 
     const { start, end } = currentMonthRange();
 
-    const [{ data: profile }, { data: fixed }, { data: transactions }] =
-      await Promise.all([
-        supabase.from("profiles").select("*").eq("id", user.id).single(),
-        supabase
-          .from("fixed_expenses")
-          .select("*")
-          .eq("user_id", user.id)
-          .eq("active", true),
-        supabase
-          .from("transactions")
-          .select("*")
-          .eq("user_id", user.id)
-          .gte("date", start)
-          .lte("date", end),
-      ]);
+    const [{ data: profile }, { data: fixed }] = await Promise.all([
+      supabase.from("profiles").select("*").eq("id", user.id).single(),
+      supabase
+        .from("fixed_expenses")
+        .select("*")
+        .eq("user_id", user.id)
+        .eq("active", true),
+    ]);
 
     if (!profile) return null;
 
@@ -49,16 +43,25 @@ export async function AutoFinanceSync() {
       ...(profile as Profile),
       payday_day: (profile as Profile).payday_day ?? 1,
     };
-    const txList = (transactions || []) as Transaction[];
     const fixedList = (fixed || []) as FixedExpense[];
 
-    await ensureMonthlyIncome(supabase, user.id, p, txList);
+    await repairTimezoneShiftedAutoDates(supabase, user.id, p);
+
+    const { data: monthTx } = await supabase
+      .from("transactions")
+      .select("*")
+      .eq("user_id", user.id)
+      .gte("date", start)
+      .lte("date", end);
+    const syncedTx = (monthTx || []) as Transaction[];
+
+    await ensureMonthlyIncome(supabase, user.id, p, syncedTx);
     await ensureFixedExpenseTransactions(
       supabase,
       user.id,
       p,
       fixedList,
-      txList
+      syncedTx
     );
 
     await withTimeout(

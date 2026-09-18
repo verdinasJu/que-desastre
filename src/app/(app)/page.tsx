@@ -81,13 +81,15 @@ export default async function DashboardPage({
     monthExpenses,
     fixedList,
     start,
-    end
+    end,
+    isCurrent
   );
   const evolution = monthlyEvolution(
     p,
     txList,
     6,
-    new Date(month.year, month.monthIndex, 1)
+    new Date(month.year, month.monthIndex, 1),
+    fixedList
   );
   const overBudgetAmount =
     isCurrent && stats.disponibleParaGastar < 0
@@ -157,7 +159,7 @@ export default async function DashboardPage({
         <StatCard
           title="Ahorro del mes"
           value={stats.ahorroDelMes}
-          hint="Nómina + extras − fijos − inversiones − gastos del mes"
+          hint="Nómina + extras − fijos − gastos (las inversiones siguen siendo tuyas)"
           icon={PiggyBank}
           tone={stats.ahorroDelMes >= 0 ? "positive" : "warning"}
           currency={p.currency}
@@ -179,6 +181,7 @@ export default async function DashboardPage({
         monthStart={start}
         monthEnd={end}
         currency={p.currency}
+        accrueConfigured={isCurrent}
       />
     </div>
   );

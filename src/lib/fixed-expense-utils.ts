@@ -20,6 +20,15 @@ export function manualFixedPaymentsForMonth(
     .reduce((acc, t) => acc + Number(t.amount), 0);
 }
 
+function normalizeMatch(s: string) {
+  return s
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
 export function isManualFixedPayment(
   t: Transaction,
   fixed: FixedExpense,
@@ -29,23 +38,17 @@ export function isManualFixedPayment(
   if (t.type !== "expense" || t.fixed_expense_id) return false;
   if (t.date < start || t.date > end) return false;
 
-  const name = fixed.name.toLowerCase();
-  const desc = t.description.toLowerCase();
-  const amount = Number(fixed.amount);
-  const paid = Number(t.amount);
+  const name = normalizeMatch(fixed.name);
+  const desc = normalizeMatch(t.description);
+  if (!name || !desc) return false;
 
-  if (desc.includes(name) || name.includes(desc.slice(0, Math.min(desc.length, 6)))) {
-    return true;
-  }
+  if (desc === name || (name.length >= 3 && desc.includes(name))) return true;
+  if (desc.length >= 5 && name.includes(desc)) return true;
 
   if (
     (name.includes("alquiler") || name.includes("renta")) &&
     (desc.includes("alqu") || desc.includes("renta") || desc.includes("alquier"))
   ) {
-    return true;
-  }
-
-  if (t.category === fixed.category && Math.abs(paid - amount) <= 1) {
     return true;
   }
 
@@ -118,18 +121,39 @@ export function isManualFixedDuplicateTx(
   );
 }
 
-/** Gastos por categoría: fijos configurados agrupados + variables sin duplicar fijos. */
+/** Gastos por categoría: fijos agrupados + variables sin duplicar fijos. */
 export function expensesByCategoryForMonth(
   monthExpenses: Transaction[],
   fixedExpenses: FixedExpense[],
   monthStart: string,
-  monthEnd: string
+  monthEnd: string,
+  accrueConfigured = true
 ): { name: string; value: number }[] {
   const map = new Map<string, number>();
-  const fixedTotal = sumActiveFixedExpenses(fixedExpenses);
 
-  if (fixedTotal > 0) {
-    map.set(FIXED_CHART_CATEGORY, fixedTotal);
+  if (accrueConfigured) {
+    const fixedTotal = sumActiveFixedExpenses(fixedExpenses);
+    if (fixedTotal > 0) {
+      map.set(FIXED_CHART_CATEGORY, fixedTotal);
+    }
+  } else {
+    const recordedFixed = monthExpenses
+      .filter(
+        (t) =>
+          t.type === "expense" &&
+          (Boolean(t.fixed_expense_id) ||
+            isManualFixedDuplicateTx(
+              monthExpenses,
+              t,
+              fixedExpenses,
+              monthStart,
+              monthEnd
+            ))
+      )
+      .reduce((acc, t) => acc + Number(t.amount), 0);
+    if (recordedFixed > 0) {
+      map.set(FIXED_CHART_CATEGORY, recordedFixed);
+    }
   }
 
   for (const t of monthExpenses) {
@@ -165,16 +189,18 @@ export interface CategoryExpenseRow {
   isPending?: boolean;
 }
 
-/** Gastos concretos de una categoría del gráfico (mes en curso). */
+/** Gastos concretos de una categoría del gráfico. */
 export function getCategoryExpensesForMonth(
   categoryName: string,
   monthExpenses: Transaction[],
   fixedExpenses: FixedExpense[],
   monthStart: string,
-  monthEnd: string
+  monthEnd: string,
+  accrueConfigured = true
 ): CategoryExpenseRow[] {
   if (categoryName === FIXED_CHART_CATEGORY) {
     const rows: CategoryExpenseRow[] = [];
+    const seen = new Set<string>();
 
     for (const fixed of fixedExpenses.filter((f) => f.active)) {
       const configured = Number(fixed.amount);
@@ -188,6 +214,7 @@ export function getCategoryExpensesForMonth(
 
       if (linked.length > 0) {
         for (const t of linked) {
+          seen.add(t.id);
           rows.push({
             id: t.id,
             description: t.description || fixed.name,
@@ -198,7 +225,7 @@ export function getCategoryExpensesForMonth(
         }
         const covered = linked.reduce((acc, t) => acc + Number(t.amount), 0);
         const remaining = configured - covered;
-        if (remaining > 0.01) {
+        if (accrueConfigured && remaining > 0.01) {
           rows.push({
             id: `pending-${fixed.id}`,
             description: `${fixed.name} (pendiente)`,
@@ -208,7 +235,7 @@ export function getCategoryExpensesForMonth(
             isPending: true,
           });
         }
-      } else {
+      } else if (accrueConfigured) {
         rows.push({
           id: `config-${fixed.id}`,
           description: fixed.name,
@@ -218,6 +245,17 @@ export function getCategoryExpensesForMonth(
           isPending: true,
         });
       }
+    }
+
+    for (const t of monthExpenses) {
+      if (t.type !== "expense" || !t.fixed_expense_id || seen.has(t.id)) continue;
+      rows.push({
+        id: t.id,
+        description: t.description || t.category,
+        amount: Number(t.amount),
+        date: t.date,
+        category: t.category || "Fijos",
+      });
     }
 
     return rows.sort(

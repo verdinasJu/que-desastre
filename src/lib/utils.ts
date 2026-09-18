@@ -13,12 +13,24 @@ export function formatCurrency(amount: number, currency = "EUR") {
   }).format(amount);
 }
 
+/** YYYY-MM-DD en hora local. Evita el desfase de `toISOString()` (UTC). */
+export function localISODate(date: Date = new Date()): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
 export function formatDate(date: string | Date) {
+  const d =
+    typeof date === "string"
+      ? new Date(/^\d{4}-\d{2}-\d{2}/.test(date) ? `${date.slice(0, 10)}T12:00:00` : date)
+      : date;
   return new Intl.DateTimeFormat("es-ES", {
     day: "2-digit",
     month: "short",
     year: "numeric",
-  }).format(typeof date === "string" ? new Date(date) : date);
+  }).format(d);
 }
 
 export function currentMonthRange() {
@@ -26,8 +38,8 @@ export function currentMonthRange() {
   const start = new Date(now.getFullYear(), now.getMonth(), 1);
   const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
   return {
-    start: start.toISOString().slice(0, 10),
-    end: end.toISOString().slice(0, 10),
+    start: localISODate(start),
+    end: localISODate(end),
   };
 }
 
@@ -42,8 +54,8 @@ export function monthRangeFromKey(monthKey?: string | null) {
   const end = new Date(y, m, 0);
   return {
     key,
-    start: start.toISOString().slice(0, 10),
-    end: end.toISOString().slice(0, 10),
+    start: localISODate(start),
+    end: localISODate(end),
     year: y,
     monthIndex: m - 1,
     isCurrent: key === currentKey,

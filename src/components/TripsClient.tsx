@@ -10,7 +10,7 @@ import { DateInput } from "@/components/ui/date-input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/client";
-import { formatCurrency, formatDate, cn } from "@/lib/utils";
+import { formatCurrency, formatDate, cn, localISODate } from "@/lib/utils";
 import { ShareSpendBar, type ShareSpendRow } from "@/components/ShareSpendBar";
 import { RedeemInviteCard } from "@/components/RedeemInviteCard";
 import type { Trip, Transaction } from "@/lib/types";
@@ -34,8 +34,8 @@ export function TripsClient({
   const [trips, setTrips] = useState(initialTrips);
   const [name, setName] = useState("");
   const [budget, setBudget] = useState("");
-  const [start, setStart] = useState(new Date().toISOString().slice(0, 10));
-  const [end, setEnd] = useState(new Date().toISOString().slice(0, 10));
+  const [start, setStart] = useState(localISODate());
+  const [end, setEnd] = useState(localISODate());
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [inviteShown, setInviteShown] = useState<Record<string, string>>({});
@@ -77,7 +77,7 @@ export function TripsClient({
     loadShared();
   }, [trips, sharedSet]);
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localISODate();
 
   function spentInDates(trip: Trip) {
     const byId = transactions

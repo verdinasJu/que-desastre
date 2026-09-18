@@ -53,6 +53,7 @@ interface ChartsProps {
   monthStart: string;
   monthEnd: string;
   currency?: string;
+  accrueConfigured?: boolean;
 }
 
 function ChartTooltip({
@@ -101,6 +102,7 @@ export function DashboardCharts({
   monthStart,
   monthEnd,
   currency = "EUR",
+  accrueConfigured = true,
 }: ChartsProps) {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
@@ -118,7 +120,8 @@ export function DashboardCharts({
       monthExpenses,
       fixedExpenses,
       monthStart,
-      monthEnd
+      monthEnd,
+      accrueConfigured
     );
   }, [
     selectedCategory,
@@ -126,6 +129,7 @@ export function DashboardCharts({
     fixedExpenses,
     monthStart,
     monthEnd,
+    accrueConfigured,
   ]);
 
   const selectedTotal = selectedRows.reduce((acc, r) => acc + r.amount, 0);

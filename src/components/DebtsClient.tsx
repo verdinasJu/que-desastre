@@ -10,7 +10,7 @@ import { DateInput } from "@/components/ui/date-input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/client";
-import { formatCurrency, formatDate, cn } from "@/lib/utils";
+import { formatCurrency, formatDate, cn, localISODate } from "@/lib/utils";
 import type { Debt, DebtDirection } from "@/lib/types";
 
 interface DebtsClientProps {
@@ -169,7 +169,7 @@ export function DebtsClient({
             {filtered.map((d) => {
               const rest = remaining(d);
               const overdue =
-                d.due_date && d.due_date < new Date().toISOString().slice(0, 10);
+                d.due_date && d.due_date < localISODate();
               return (
                 <li
                   key={d.id}
